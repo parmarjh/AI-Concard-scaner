@@ -1,4 +1,4 @@
-# AI Visiting Card Scanner
+# AI Visiting Contact Card Scanner
 
 An AI-powered business card management tool that extracts contact information from card images and organizes it into a digital contact book.
 
