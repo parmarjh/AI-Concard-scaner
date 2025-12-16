@@ -64,7 +64,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
     // setUploadMode('image'); // Optionally reset mode, or keep user's last choice
   }, []); // Added closeCamera to dependency if it's defined outside or memoized
 
-   const closeCamera = useCallback(() => {
+  const closeCamera = useCallback(() => {
     if (videoStream) {
       videoStream.getTracks().forEach(track => track.stop());
     }
@@ -126,7 +126,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
       setSelectedDocumentFile(null);
     }
   };
-  
+
   const processAndDisplayParsedData = (parsedResult: Partial<OCRResult>, sourceFilename?: string) => {
     setExtractedData(parsedResult);
     const initialFormData: CardFormData = {
@@ -170,16 +170,19 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
 
 
       const imagePart = {
-        inlineData: { mimeType: selectedImage?.type || mimeType , data: base64Image },
+        inlineData: { mimeType: selectedImage?.type || mimeType, data: base64Image },
       };
       const textPart = {
-        text: `Analyze this business card image and extract contact information. 
+        text: `Analyze this business card image and extract contact information.
+               This image may contain handwritten text (pen/pencil) or printed text.
+               Please do your best to decipher difficult handwriting.
+               Infer missing details if possible (e.g., derive website from email domain if clear).
                Provide output as JSON: {'name' (string), 'title' (string), 'company' (string), 
                'phone' (array of strings), 'email' (array of strings), 
                'address' (string), 'website' (string), 'notes' (string)}. 
-               Omit fields not found. Focus on accuracy.`,
+               Omit fields not found. Focus on accuracy and completeness.`,
       };
-      
+
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-2.5-flash-preview-04-17',
         contents: { parts: [imagePart, textPart] },
@@ -190,7 +193,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
       const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
       const match = jsonStr.match(fenceRegex);
       if (match && match[2]) jsonStr = match[2].trim();
-      
+
       const parsedResult: OCRResult = JSON.parse(jsonStr);
       processAndDisplayParsedData(parsedResult, selectedImage?.name || 'camera_capture.jpg');
     } catch (err: any) {
@@ -276,21 +279,23 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
         }
 
         if (!fullText.trim()) {
-            setError(t('addCardModal.errorPdfText'));
-            setIsProcessing(false);
-            return;
+          setError(t('addCardModal.errorPdfText'));
+          setIsProcessing(false);
+          return;
         }
 
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const textPart = {
           text: `Extract contact information from the following text, which was extracted from a document.
+                 The text may be unstructured or containOCR errors.
+                 Infer missing details if possible (e.g., derive website from email domain).
                  Provide output as JSON: {'name' (string), 'title' (string), 'company' (string), 
                  'phone' (array of strings), 'email' (array of strings), 
                  'address' (string), 'website' (string), 'notes' (string)}. 
                  If a field is not found, omit it or return an empty string/array. Be concise.
                  Text: \n${fullText}`,
         };
-        
+
         const response: GenerateContentResponse = await ai.models.generateContent({
           model: 'gemini-2.5-flash-preview-04-17',
           contents: { parts: [textPart] },
@@ -301,7 +306,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
         const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
         const match = jsonStr.match(fenceRegex);
         if (match && match[2]) jsonStr = match[2].trim();
-        
+
         const parsedResult: OCRResult = JSON.parse(jsonStr);
         processAndDisplayParsedData(parsedResult, selectedDocumentFile.name);
         setIsProcessing(false);
@@ -312,7 +317,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
       setIsProcessing(false);
     }
   };
-  
+
   const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -352,8 +357,8 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
 
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "environment" } 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
         });
         setVideoStream(stream);
         if (videoRef.current) {
@@ -364,16 +369,16 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
         console.error("Error accessing camera:", err);
         // Fallback if environment facingMode fails or other error
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            setVideoStream(stream);
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-            }
-            setIsCameraOpen(true);
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setVideoStream(stream);
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+          setIsCameraOpen(true);
         } catch (fallbackErr: any) {
-            console.error("Error accessing camera (fallback):", fallbackErr);
-            setCameraError(t('addCardModal.errorCameraAccess', {errorName: fallbackErr.name}));
-            setIsCameraOpen(false);
+          console.error("Error accessing camera (fallback):", fallbackErr);
+          setCameraError(t('addCardModal.errorCameraAccess', { errorName: fallbackErr.name }));
+          setIsCameraOpen(false);
         }
       }
     } else {
@@ -402,9 +407,9 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
           const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
           setSelectedImage(file); // Set this for handleScanImage if it relies on File object properties like .name or .type
         } catch (e) {
-            console.error("Error converting camera capture to file:", e);
-            // Fallback: selectedImage might remain null, but previewUrl is set.
-            // handleScanImage should be robust enough or primarily use previewUrl for image data.
+          console.error("Error converting camera capture to file:", e);
+          // Fallback: selectedImage might remain null, but previewUrl is set.
+          // handleScanImage should be robust enough or primarily use previewUrl for image data.
         }
       }
       closeCamera(); // Close camera stream after capture
@@ -415,7 +420,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
 
 
   if (!isOpen) return null;
-  
+
   const currentActionLabel = uploadMode === 'image' ? t('addCardModal.scanWithAI') : t('addCardModal.parseDocument');
   const currentProcessingLabel = uploadMode === 'image' ? t('addCardModal.scanning') : t('addCardModal.parsing');
 
@@ -447,17 +452,17 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
               {(['image', 'file'] as UploadMode[]).map(mode => (
                 <button
                   key={mode}
-                  onClick={() => { setUploadMode(mode); setError(null); setCameraError(null); setSelectedImage(null); setSelectedDocumentFile(null); setPreviewUrl(null); closeCamera();}}
+                  onClick={() => { setUploadMode(mode); setError(null); setCameraError(null); setSelectedImage(null); setSelectedDocumentFile(null); setPreviewUrl(null); closeCamera(); }}
                   className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all duration-200 ease-in-out flex items-center justify-center gap-2
                     ${uploadMode === mode ? 'bg-primary text-white shadow' : 'text-neutral-dark hover:bg-neutral-200'}`}
                 >
-                  {mode === 'image' ? <ImageFileIcon className="w-5 h-5"/> : <FileTextIcon className="w-5 h-5"/>}
+                  {mode === 'image' ? <ImageFileIcon className="w-5 h-5" /> : <FileTextIcon className="w-5 h-5" />}
                   {mode === 'image' ? t('addCardModal.scanImage') : t('addCardModal.uploadDocument')}
                 </button>
               ))}
             </div>
           )}
-          
+
           <canvas ref={canvasRef} className="hidden"></canvas> {/* Hidden canvas for image capture */}
 
           {error && (
@@ -466,7 +471,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
               <p>{error}</p>
             </div>
           )}
-           {cameraError && step === 1 && uploadMode === 'image' && (
+          {cameraError && step === 1 && uploadMode === 'image' && (
             <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 rounded-md text-sm" role="alert">
               <p className="font-bold">{t('addCardModal.cameraIssueTitle')}</p>
               <p>{cameraError}</p>
@@ -500,13 +505,13 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
                     </div>
                   </div>
                   <div className="mt-4 text-center">
-                     <p className="text-sm text-neutral-dark mb-2">{t('addCardModal.useCameraPrompt')}</p>
+                    <p className="text-sm text-neutral-dark mb-2">{t('addCardModal.useCameraPrompt')}</p>
                     <button
-                        type="button"
-                        onClick={openCamera}
-                        className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-indigo-700 border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                      type="button"
+                      onClick={openCamera}
+                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-indigo-700 border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                     >
-                        <CameraIcon className="w-5 h-5 mr-2" /> {t('addCardModal.useCamera')}
+                      <CameraIcon className="w-5 h-5 mr-2" /> {t('addCardModal.useCamera')}
                     </button>
                   </div>
 
@@ -520,32 +525,32 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
               ) : (
                 // Camera View
                 <div className="space-y-3">
-                  <video 
-                    ref={videoRef} 
-                    autoPlay 
-                    playsInline 
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
                     muted /* Muted is important for autoplay without user gesture */
-                    className="w-full h-auto max-h-[300px] bg-neutral-dark rounded-md border border-neutral-300" 
+                    className="w-full h-auto max-h-[300px] bg-neutral-dark rounded-md border border-neutral-300"
                   />
                   <div className="flex gap-2">
                     <button
-                        type="button"
-                        onClick={capturePhoto}
-                        className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-secondary hover:bg-emerald-700 border border-transparent rounded-md shadow-sm"
+                      type="button"
+                      onClick={capturePhoto}
+                      className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-secondary hover:bg-emerald-700 border border-transparent rounded-md shadow-sm"
                     >
-                        <CameraIcon className="w-5 h-5 mr-2" /> {t('addCardModal.capturePhoto')}
+                      <CameraIcon className="w-5 h-5 mr-2" /> {t('addCardModal.capturePhoto')}
                     </button>
                     <button
-                        type="button"
-                        onClick={closeCamera}
-                        className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-neutral-dark bg-neutral-light hover:bg-neutral-200 border border-neutral-300 rounded-md shadow-sm"
+                      type="button"
+                      onClick={closeCamera}
+                      className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-neutral-dark bg-neutral-light hover:bg-neutral-200 border border-neutral-300 rounded-md shadow-sm"
                     >
-                        {t('addCardModal.cancelCamera')}
+                      {t('addCardModal.cancelCamera')}
                     </button>
                   </div>
                 </div>
               )}
-               {/* Show preview from camera capture after capture, before scan */}
+              {/* Show preview from camera capture after capture, before scan */}
               {previewUrl && selectedImage?.name.startsWith('camera_capture') && !isCameraOpen && (
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-neutral-dark mb-1">{t('addCardModal.capturePreview')}</h3>
@@ -554,7 +559,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
               )}
             </>
           )}
-          
+
           {step === 1 && uploadMode === 'file' && (
             <>
               <div className="space-y-2">
@@ -587,7 +592,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
           )}
 
           {step === 2 && (
-             <form className="space-y-3 sm:space-y-4">
+            <form className="space-y-3 sm:space-y-4">
               {previewUrl && ( // Show image preview in review step
                 <div className="mb-3">
                   <h3 className="text-sm font-medium text-neutral-dark mb-1">{t('addCardModal.cardImage')}</h3>
@@ -595,7 +600,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
                 </div>
               )}
               {(Object.keys(formData) as Array<keyof CardFormData>).map((key) => {
-                 const label = t(`addCardModal.form.${key}`);
+                const label = t(`addCardModal.form.${key}`);
 
                 return (
                   <div key={key}>
@@ -611,11 +616,11 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
                       className="mt-1 block w-full px-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
                       placeholder={t('addCardModal.form.enterPlaceholder', { field: label.toLowerCase() })}
                     />
-                     {(key === 'phone' || key === 'email') && <p className="text-xs text-neutral mt-1">{t('addCardModal.form.commaSeparated')}</p>}
+                    {(key === 'phone' || key === 'email') && <p className="text-xs text-neutral mt-1">{t('addCardModal.form.commaSeparated')}</p>}
                   </div>
                 );
               })}
-               <div>
+              <div>
                 <label htmlFor="notes" className="block text-sm font-medium text-neutral-dark">
                   {t('addCardModal.form.notes')}
                 </label>
@@ -626,7 +631,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
                   value={formData.notes || ''}
                   onChange={handleFormChange}
                   className="mt-1 block w-full px-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
-                  placeholder={t('addCardModal.form.enterPlaceholder', { field: t('addCardModal.form.notes').toLowerCase()})}
+                  placeholder={t('addCardModal.form.enterPlaceholder', { field: t('addCardModal.form.notes').toLowerCase() })}
                 />
               </div>
             </form>
@@ -662,27 +667,27 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
           )}
           {step === 2 && (
             <>
-            <button
-              type="button"
-              onClick={() => {
-                setError(null); 
-                setCameraError(null);
-                setStep(1); 
-                // Don't reset selected files/preview here, user might want to re-process with adjustments or re-upload/re-capture
-              }}
-              className="w-full sm:w-auto flex items-center justify-center px-4 py-2 text-sm font-medium text-neutral-dark bg-white border border-neutral-300 rounded-md shadow-sm hover:bg-neutral-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
-            >
-               <EditIcon className="w-5 h-5 mr-2"/>
-              {t('addCardModal.editRescan')}
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveContact}
-              className="w-full sm:w-auto flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-indigo-700 border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
-            >
-              <UserIcon className="w-5 h-5 mr-2" />
-              {t('addCardModal.saveContact')}
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setCameraError(null);
+                  setStep(1);
+                  // Don't reset selected files/preview here, user might want to re-process with adjustments or re-upload/re-capture
+                }}
+                className="w-full sm:w-auto flex items-center justify-center px-4 py-2 text-sm font-medium text-neutral-dark bg-white border border-neutral-300 rounded-md shadow-sm hover:bg-neutral-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+              >
+                <EditIcon className="w-5 h-5 mr-2" />
+                {t('addCardModal.editRescan')}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveContact}
+                className="w-full sm:w-auto flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-indigo-700 border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+              >
+                <UserIcon className="w-5 h-5 mr-2" />
+                {t('addCardModal.saveContact')}
+              </button>
             </>
           )}
         </footer>

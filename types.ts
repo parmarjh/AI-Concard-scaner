@@ -10,6 +10,7 @@ export interface Contact {
   website?: string;
   notes?: string;
   cardImageUrl?: string; // base64 string or URL
+  imageUrl?: string; // Profile/avatar image
   isFavorite?: boolean;
   createdAt: string;
   updatedAt: string;
