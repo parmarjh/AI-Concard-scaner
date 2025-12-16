@@ -6,7 +6,7 @@ import ArViewPage from './pages/ArViewPage';
 import AdminPage from './pages/AdminPage';
 import { User } from './types';
 import { auth, isFirebaseConfigured } from './firebaseConfig'; // Import Firebase auth and config check
-import { onAuthStateChanged, User as FirebaseUser, signInWithPopup, signOut } from 'firebase/auth';
+import { onAuthStateChanged, User as FirebaseUser, signInWithPopup, signOut, GoogleAuthProvider } from 'firebase/auth';
 import { googleAuthProvider } from './firebaseConfig';
 import { SpinnerIcon } from './components/icons'; // For loading state
 import { useTranslation } from 'react-i18next';
@@ -52,12 +52,15 @@ const App: React.FC = () => {
     }
     setAuthError(null);
     try {
-      await signInWithPopup(auth, googleAuthProvider);
+      const result = await signInWithPopup(auth, googleAuthProvider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        sessionStorage.setItem('googleAccessToken', credential.accessToken);
+      }
       // onAuthStateChanged will handle setting the user
     } catch (error: any) {
       console.error("Error during Google sign-in:", error);
       setAuthError(error.message || t('app.authErrorDefault'));
-      // Handle specific errors if needed, e.g., error.code === 'auth/popup-closed-by-user'
     }
   }, [t]);
 

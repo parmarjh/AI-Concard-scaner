@@ -1,9 +1,11 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Contact } from '../types';
 import ContactQRCode from './ContactQRCode';
-import { ArIcon, EditIcon, DeleteIcon, UserIcon, StarIcon, QrCodeIcon } from './icons';
+import { ArIcon, EditIcon, DeleteIcon, UserIcon, StarIcon, QrCodeIcon, GoogleIcon, SpinnerIcon } from './icons';
+import { saveToGoogleContacts } from '../utils/googleContacts';
 
 interface ContactCardProps {
   contact: Contact;
@@ -12,7 +14,15 @@ interface ContactCardProps {
 const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
   const { t } = useTranslation();
   const [showQR, setShowQR] = React.useState(false);
+  const [isSavingGoogle, setIsSavingGoogle] = React.useState(false);
 
+  const handleGoogleSave = async () => {
+    if (isSavingGoogle) return;
+    setIsSavingGoogle(true);
+    const result = await saveToGoogleContacts(contact);
+    alert(result.message);
+    setIsSavingGoogle(false);
+  };
 
   const displayInfo = (labelKey: 'email' | 'phone' | 'website' | 'address', value?: string | string[]) => {
     if (!value || (Array.isArray(value) && value.length === 0)) return null;
@@ -42,15 +52,6 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
               {contact.title && <p className="text-sm text-neutral-dark truncate" title={contact.title}>{contact.title}</p>}
             </div>
           </div>
-          {/* Future favorite button
-          <button 
-            onClick={() => onToggleFavorite && onToggleFavorite(contact.id)} 
-            className="text-neutral hover:text-yellow-500 transition-colors"
-            aria-label={contact.isFavorite ? "Unmark as favorite" : "Mark as favorite"}
-          >
-            <StarIcon filled={contact.isFavorite} className="w-5 h-5" />
-          </button>
-          */}
         </div>
 
         {contact.company && <p className="text-sm font-medium text-secondary mb-2 truncate" title={contact.company}>{contact.company}</p>}
@@ -66,7 +67,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
-                onClick={(e) => e.stopPropagation()} // Prevent card click if any
+                onClick={(e) => e.stopPropagation()}
               >
                 {contact.website}
               </a>
@@ -78,22 +79,15 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
 
       <div className="bg-neutral-light/50 p-3 border-t border-neutral-200">
         <div className="flex items-center justify-end space-x-2">
-          {/* Placeholder for future edit/delete
-           <button 
-            className="p-2 text-neutral hover:text-primary transition-colors" 
-            aria-label="Edit contact"
-            // onClick={() => onEdit && onEdit(contact)}
-           >
-            <EditIcon className="w-4 h-4" />
-          </button>
-          <button 
-            className="p-2 text-neutral hover:text-red-500 transition-colors" 
-            aria-label="Delete contact"
-            // onClick={() => onDelete && onDelete(contact.id)}
+          <button
+            onClick={handleGoogleSave}
+            className="flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md transition-colors mr-2"
+            title="Save to Google Contacts"
+            disabled={isSavingGoogle}
           >
-            <DeleteIcon className="w-4 h-4" />
+            {isSavingGoogle ? <SpinnerIcon className="w-4 h-4 mr-1.5" /> : <GoogleIcon className="w-4 h-4 mr-1.5" />}
+            Google
           </button>
-          */}
           <button
             onClick={() => setShowQR(true)}
             className="flex items-center text-xs font-medium text-primary hover:text-primary-dark bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors mr-2"

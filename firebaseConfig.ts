@@ -26,6 +26,7 @@ if (isFirebaseConfigured) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   googleAuthProvider = new GoogleAuthProvider();
+  googleAuthProvider.addScope('https://www.googleapis.com/auth/contacts');
 } else {
   console.warn("Firebase is not configured. Please add your Firebase project configuration in firebaseConfig.ts. Authentication features will be disabled.");
 }

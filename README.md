@@ -16,12 +16,14 @@ AI Concard Scanner is a state-of-the-art **Progressive Web Application (PWA)** t
 - **Handwritten Text Recognition**: Capable of deciphering complex handwriting (pen/pencil) on physical paper cards.
 - **Intelligent Inference**: Automatically infers missing details (e.g., deriving website URLs from email domains) to complete contact profiles.
 - **Unstructured Data Parsing**: Robustly handles non-standard card layouts and artistic designs.
+- **Original Card Link**: Maintains a digital link to the original handwritten card image for side-by-side verification.
 
 ### ⚡ Core Capabilities
 - **Real-time OCR & Extraction**: powered by **Google Gemini 2.5 Flash**.
 - **Barcode & QR Scanner**: Integrated scanning for vCard QR codes with auto-parsing.
+- **Smart Barcode Generation**: Instantly generates **2D & 3D-visualized QR codes** for any contact for seamless sharing.
 - **Auto Avatar Generation**: Creates unique 3D/Gradient avatars or fetches AI-generated personas for contacts without photos.
-- **Smart Contact Management**: Search, sort, favorite, and organize contacts efficiently.
+- **Cloud Integration**: Native **Google Contacts Sync** (1-click save) using the People API.
 
 ### 💾 Export & Sharing
 - **Universal vCard (.vcf) Export**: Compatible with iOS, Android, and Outlook.
@@ -35,9 +37,9 @@ AI Concard Scanner is a state-of-the-art **Progressive Web Application (PWA)** t
 ### Watch AI Concard Scanner in Action
 *(Click thumbnails to play)*
 
-| Mobile Scanning | Handwritten Detection | 3D Avatar Generation |
+| Mobile Scanning | Handwritten Detection | 3D Visualization |
 |:---:|:---:|:---:|
-| [![Mobile Scanning](https://via.placeholder.com/200x120?text=Mobile+Scan)](https://example.com) | [![Handwritten](https://via.placeholder.com/200x120?text=Handwritten+AI)](https://example.com) | [![Avatars](https://via.placeholder.com/200x120?text=Avatar+Gen)](https://example.com) |
+| [![Mobile Scanning](https://via.placeholder.com/200x120?text=Mobile+Scan)](https://example.com) | [![Handwritten](https://via.placeholder.com/200x120?text=Handwritten+AI)](https://example.com) | [![Avatars](https://via.placeholder.com/200x120?text=3D+Code+Gen)](https://example.com) |
 
 ---
 
@@ -64,8 +66,8 @@ The "3D" approach refers to the three dimensions of analysis: **Visual**, **Text
     - **Token Classification**: Categorizes tokens into Name, Title, Company, etc.
     - **Inference Engine**: Reconstructs missing relations (e.g., associating a specific phone number with "Mobile" vs "Work").
 
-### 3. **Data Structuring** 🧬
-Raw inference is mapped to a strict **JSON Schema**:
+### 3. **Data Structuring & Sync** 🧬
+Raw inference is mapped to a strict **JSON Schema** and synchronized:
 ```json
 {
   "name": "Jane Doe",
@@ -75,6 +77,7 @@ Raw inference is mapped to a strict **JSON Schema**:
   "phone": ["+1-555-0123"]
 }
 ```
+*Data is accepted into the local PouchDB/Firestore and optionally pushed to Google Contacts.*
 
 ---
 
@@ -84,9 +87,11 @@ Raw inference is mapped to a strict **JSON Schema**:
 AI-visiting-card-scaner/
 ├── components/           # UI Components (React)
 │   ├── AddCardModal.tsx  # Core AI Integration
-│   ├── BarcodeScanner.tsx# QR/Barcode Logic
+│   ├── ContactQRCode.tsx # 2D/3D Barcode Generation
+│   ├── BarcodeScanner.tsx# QR/Barcode Scanning Logic
 │   └── ...
 ├── utils/                # Helper Algorithms
+│   ├── googleContacts.ts # Google People API Integration
 │   ├── avatarGenerator.ts# Avatar Gen Logic
 │   └── contactSaver.ts   # vCard/Export Logic
 ├── pages/                # Route Pages
@@ -104,6 +109,8 @@ AI-visiting-card-scaner/
 - **Build Tool**: Vite (Optimized for speed)
 - **AI Core**: Google Gemini API (`gemini-2.5-flash-preview`)
 - **Computer Vision**: @zxing/library (Local QR), Gemini Vision (Cloud OCR)
+- **Generation Engine**: qrcode (Client-side 2D generation)
+- **Integration**: Google People API (Contacts Sync)
 - **Avatar Engine**: DiceBear API (HTTP-based generation)
 - **Database/Auth**: Firebase (Cloud Firestore & Authentication)
 - **PWA**: Service Workers with offline caching strategies
@@ -150,7 +157,7 @@ interface Contact {
 
 2.  **Configuration**:
     - Create `.env` file with `GEMINI_API_KEY=your_key_here`.
-    - Setup `firebaseConfig.ts`.
+    - Setup `firebaseConfig.ts` with your project credentials.
 
 3.  **Run Development Server**:
     ```bash
