@@ -1,8 +1,8 @@
 {
-  "appName": "AI Card Manager",
+  "appName": "AI Concard Scanner",
   "loading": "Loading...",
   "navbar": {
-    "title": "AI Card Manager",
+    "title": "AI Concard Scanner",
     "dashboard": "Dashboard",
     "admin": "Admin",
     "login": "Login",
@@ -18,7 +18,7 @@
     "signoutErrorDefault": "Failed to logout. Please try again.",
     "pageNotFound": "404 - Page Not Found",
     "pageNotFoundMessage": "The page you are looking for does not exist.",
-    "footer": "© {{year}} AI Visiting Card Manager. All rights reserved.",
+    "footer": "© {{year}} AI Concard Scanner. All rights reserved.",
     "firebaseNotConfigured": "Firebase is not configured. Authentication is currently unavailable.",
     "firebaseNotConfiguredAdmin": "Firebase Not Configured",
     "firebaseNotConfiguredAdminMessage": "Authentication is disabled. Please add your Firebase project configuration to `firebaseConfig.ts` to enable login and user features."

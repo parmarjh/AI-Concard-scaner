@@ -1,8 +1,8 @@
 {
-  "appName": "Gestor de Tarjetas IA",
+  "appName": "Escáner de Concard IA",
   "loading": "Cargando...",
   "navbar": {
-    "title": "Gestor de Tarjetas IA",
+    "title": "Escáner de Concard IA",
     "dashboard": "Panel",
     "admin": "Admin",
     "login": "Iniciar Sesión",
@@ -18,7 +18,7 @@
     "signoutErrorDefault": "Error al cerrar sesión. Por favor, inténtalo de nuevo.",
     "pageNotFound": "404 - Página No Encontrada",
     "pageNotFoundMessage": "La página que buscas no existe.",
-    "footer": "© {{year}} Gestor de Tarjetas IA. Todos los derechos reservados.",
+    "footer": "© {{year}} Escáner de Concard IA. Todos los derechos reservados.",
     "firebaseNotConfigured": "Firebase no está configurado. La autenticación no está disponible actualmente.",
     "firebaseNotConfiguredAdmin": "Firebase No Configurado",
     "firebaseNotConfiguredAdminMessage": "La autenticación está deshabilitada. Por favor, añade la configuración de tu proyecto de Firebase a `firebaseConfig.ts` para habilitar el inicio de sesión y las funciones de usuario."

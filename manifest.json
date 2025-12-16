@@ -1,6 +1,6 @@
 {
-  "short_name": "AI Card Manager",
-  "name": "AI Visiting Card Manager",
+  "short_name": "AI Concard Scanner",
+  "name": "AI Concard Scanner",
   "description": "A web application to scan, store, and manage visiting cards using AI-powered OCR and entity extraction, with a simulated AR view.",
   "icons": [
     {
