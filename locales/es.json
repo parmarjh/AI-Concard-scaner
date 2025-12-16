@@ -101,6 +101,10 @@
     "arView": "Vista RA",
     "arViewLabel": "Ver RA para {{name}}"
   },
+  "contactQR": {
+    "title": "Código de Contacto",
+    "subtitle": "Escanea para añadir a contactos"
+  },
   "arView": {
     "title": "Vista RA para: {{name}}",
     "subtitle": "Visualizando detalles de contacto en una interfaz tipo realidad aumentada.",

@@ -101,6 +101,10 @@
     "arView": "AR View",
     "arViewLabel": "View AR for {{name}}"
   },
+  "contactQR": {
+    "title": "Contact Barcode",
+    "subtitle": "Scan to add to contacts"
+  },
   "arView": {
     "title": "AR View for: {{name}}",
     "subtitle": "Visualizing contact details in an augmented reality like interface.",

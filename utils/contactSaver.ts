@@ -71,7 +71,7 @@ export async function saveAsVCard(contact: Contact): Promise<ContactSaveResult> 
 /**
  * Generate vCard 3.0 format string from contact
  */
-function generateVCard(contact: Contact): string {
+export function generateVCard(contact: Contact): string {
     const lines: string[] = [];
 
     lines.push('BEGIN:VCARD');

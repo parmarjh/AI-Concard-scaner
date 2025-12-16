@@ -2,17 +2,17 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Contact } from '../types';
-import { ArIcon, EditIcon, DeleteIcon, UserIcon, StarIcon } from './icons'; // Assuming StarIcon is for favorites
+import ContactQRCode from './ContactQRCode';
+import { ArIcon, EditIcon, DeleteIcon, UserIcon, StarIcon, QrCodeIcon } from './icons';
 
 interface ContactCardProps {
   contact: Contact;
-  // onToggleFavorite?: (id: string) => void; // Future use
-  // onEdit?: (contact: Contact) => void; // Future use
-  // onDelete?: (id: string) => void; // Future use
 }
 
 const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
   const { t } = useTranslation();
+  const [showQR, setShowQR] = React.useState(false);
+
 
   const displayInfo = (labelKey: 'email' | 'phone' | 'website' | 'address', value?: string | string[]) => {
     if (!value || (Array.isArray(value) && value.length === 0)) return null;
@@ -31,7 +31,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center">
             {contact.cardImageUrl ? (
-              <img src={contact.cardImageUrl} alt={contact.name} className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-primary/20"/>
+              <img src={contact.cardImageUrl} alt={contact.name} className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-primary/20" />
             ) : (
               <div className="w-12 h-12 rounded-full mr-3 bg-primary/10 flex items-center justify-center text-primary">
                 <UserIcon className="w-6 h-6" />
@@ -52,7 +52,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
           </button>
           */}
         </div>
-        
+
         {contact.company && <p className="text-sm font-medium text-secondary mb-2 truncate" title={contact.company}>{contact.company}</p>}
 
         <div className="space-y-1 text-sm">
@@ -60,11 +60,11 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
           {displayInfo("phone", contact.phone)}
           {contact.website && (
             <p className="text-xs text-neutral truncate">
-              <span className="font-medium">{t('contactCard.website')}:</span> 
-              <a 
-                href={contact.website.startsWith('http') ? contact.website : `http://${contact.website}`} 
-                target="_blank" 
-                rel="noopener noreferrer" 
+              <span className="font-medium">{t('contactCard.website')}:</span>
+              <a
+                href={contact.website.startsWith('http') ? contact.website : `http://${contact.website}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-primary hover:underline"
                 onClick={(e) => e.stopPropagation()} // Prevent card click if any
               >
@@ -78,7 +78,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
 
       <div className="bg-neutral-light/50 p-3 border-t border-neutral-200">
         <div className="flex items-center justify-end space-x-2">
-           {/* Placeholder for future edit/delete
+          {/* Placeholder for future edit/delete
            <button 
             className="p-2 text-neutral hover:text-primary transition-colors" 
             aria-label="Edit contact"
@@ -94,6 +94,14 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
             <DeleteIcon className="w-4 h-4" />
           </button>
           */}
+          <button
+            onClick={() => setShowQR(true)}
+            className="flex items-center text-xs font-medium text-primary hover:text-primary-dark bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors mr-2"
+            title="Show Barcode"
+          >
+            <QrCodeIcon className="w-4 h-4 mr-1.5" />
+            Code
+          </button>
           <Link
             to={`/ar-view/${contact.id}`}
             className="flex items-center text-xs font-medium text-secondary hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-md transition-colors"
@@ -104,6 +112,11 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
           </Link>
         </div>
       </div>
+      <ContactQRCode
+        contact={contact}
+        isOpen={showQR}
+        onClose={() => setShowQR(false)}
+      />
     </div>
   );
 };
