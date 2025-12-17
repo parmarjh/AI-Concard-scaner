@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { User } from '../types';
-import { UserIcon, LogoutIcon, SettingsIcon, GoogleIcon, SpinnerIcon, ChevronDownIcon, GlobeIcon } from './icons';
+import { UserIcon, LogoutIcon, SettingsIcon, GoogleIcon, SpinnerIcon, ChevronDownIcon, GlobeIcon, FileTextIcon } from './icons';
 import { useTranslation } from 'react-i18next';
 
 interface NavbarProps {
@@ -15,7 +15,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogin, onLogout }) => {
   const [isAuthActionInProgress, setIsAuthActionInProgress] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
-  
+
   const languages = {
     en: { nativeName: 'English' },
     es: { nativeName: 'Español' }
@@ -45,7 +45,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogin, onLogout }) => {
       setIsAuthActionInProgress(false);
     }
   };
-  
+
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
     setLangDropdownOpen(false);
@@ -60,7 +60,11 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogin, onLogout }) => {
           </Link>
           <div className="flex items-center space-x-2 sm:space-x-4">
             <Link to="/dashboard" className="text-neutral-light hover:text-secondary transition-colors px-3 py-2 rounded-md text-sm font-medium">{t('navbar.dashboard')}</Link>
-            
+            <Link to="/research" className="text-neutral-light hover:text-secondary transition-colors px-3 py-2 rounded-md text-sm font-medium flex items-center">
+              <FileTextIcon className="w-4 h-4 mr-1" />
+              Research
+            </Link>
+
             {/* Language Switcher */}
             <div className="relative">
               <button
@@ -71,18 +75,18 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogin, onLogout }) => {
                 <GlobeIcon className="w-6 h-6" />
               </button>
               {langDropdownOpen && (
-                 <div className="absolute right-0 mt-2 w-36 bg-white rounded-md shadow-lg py-1 z-20 ring-1 ring-black ring-opacity-5">
-                    {Object.keys(languages).map((lng) => (
-                        <button
-                            key={lng}
-                            style={{ fontWeight: i18n.resolvedLanguage === lng ? 'bold' : 'normal' }}
-                            type="submit"
-                            onClick={() => changeLanguage(lng)}
-                            className="block w-full text-left px-4 py-2 text-sm text-neutral-dark hover:bg-neutral-light"
-                        >
-                            {(languages as any)[lng].nativeName}
-                        </button>
-                    ))}
+                <div className="absolute right-0 mt-2 w-36 bg-white rounded-md shadow-lg py-1 z-20 ring-1 ring-black ring-opacity-5">
+                  {Object.keys(languages).map((lng) => (
+                    <button
+                      key={lng}
+                      style={{ fontWeight: i18n.resolvedLanguage === lng ? 'bold' : 'normal' }}
+                      type="submit"
+                      onClick={() => changeLanguage(lng)}
+                      className="block w-full text-left px-4 py-2 text-sm text-neutral-dark hover:bg-neutral-light"
+                    >
+                      {(languages as any)[lng].nativeName}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -125,7 +129,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogin, onLogout }) => {
                         role="menuitem"
                         onClick={() => setUserDropdownOpen(false)}
                       >
-                         <SettingsIcon className="w-5 h-5 mr-2 text-primary" /> {t('navbar.admin')}
+                        <SettingsIcon className="w-5 h-5 mr-2 text-primary" /> {t('navbar.admin')}
                       </Link>
                       <button
                         onClick={handleLogoutAttempt}

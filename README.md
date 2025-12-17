@@ -30,6 +30,22 @@ AI Concard Scanner is a state-of-the-art **Progressive Web Application (PWA)** t
 - **Web Share API**: Native mobile sharing integration.
 - **Multi-format Support**: Export data to CSV, JSON, or Excel.
 
+### 🔬 AI Research Assistant (NEW!)
+- **Instant Research Paper Generation**: Generate comprehensive research papers on any topic using AI
+- **Professional Formatting**: Well-structured papers with abstract, sections, conclusion, and future development ideas
+- **Multi-Format Export**: Download research papers in multiple formats:
+  - **PDF**: Professional PDF documents with proper formatting
+  - **DOCX**: Microsoft Word format for easy editing and collaboration
+  - **Markdown**: Plain text format perfect for README files and documentation
+- **AI-Powered Content**: Leverages Google Gemini AI for intelligent content generation
+- **Real-time Generation**: Get complete research papers in seconds
+
+### 🧪 Testing Infrastructure
+- **Vitest Integration**: Comprehensive unit testing framework
+- **React Testing Library**: Component testing for React components
+- **Continuous Testing**: Automated test suite with `npm test`
+- **High Code Coverage**: Ensuring reliability and maintainability
+
 ---
 
 ## 🎥 Demo Videos
@@ -89,16 +105,27 @@ AI-visiting-card-scaner/
 │   ├── AddCardModal.tsx  # Core AI Integration
 │   ├── ContactQRCode.tsx # 2D/3D Barcode Generation
 │   ├── BarcodeScanner.tsx# QR/Barcode Scanning Logic
-│   └── ...
+│   ├── Navbar.tsx        # Navigation Component
+│   └── icons.tsx         # Icon Library
 ├── utils/                # Helper Algorithms
 │   ├── googleContacts.ts # Google People API Integration
 │   ├── avatarGenerator.ts# Avatar Gen Logic
-│   └── contactSaver.ts   # vCard/Export Logic
+│   ├── contactSaver.ts   # vCard/Export Logic
+│   ├── geminiGenerator.ts# Research Paper AI Generation
+│   └── exportResearch.ts # Multi-format Export (PDF/DOCX/MD)
 ├── pages/                # Route Pages
+│   ├── DashboardPage.tsx # Main Contact Dashboard
+│   ├── ResearchPage.tsx  # AI Research Assistant
+│   ├── AdminPage.tsx     # Admin Panel
+│   └── ArViewPage.tsx    # AR Visualization
+├── tests/                # Testing Files
+│   ├── App.test.tsx      # App Component Tests
+│   └── setupTests.ts     # Test Configuration
 ├── locales/              # i18n JSON files
 ├── types.ts              # TypeScript Interfaces
 ├── firebaseConfig.ts     # Auth Configuration
-└── vite.config.ts        # Build Configuration
+├── vite.config.ts        # Build & Test Configuration
+└── README.md             # This File
 ```
 
 ---
@@ -107,13 +134,15 @@ AI-visiting-card-scaner/
 
 - **Frontend Framework**: React 19, TypeScript, TailwindCSS
 - **Build Tool**: Vite (Optimized for speed)
-- **AI Core**: Google Gemini API (`gemini-2.5-flash-preview`)
+- **AI Core**: Google Gemini API (`gemini-2.0-flash`)
 - **Computer Vision**: @zxing/library (Local QR), Gemini Vision (Cloud OCR)
 - **Generation Engine**: qrcode (Client-side 2D generation)
 - **Integration**: Google People API (Contacts Sync)
 - **Avatar Engine**: DiceBear API (HTTP-based generation)
 - **Database/Auth**: Firebase (Cloud Firestore & Authentication)
 - **PWA**: Service Workers with offline caching strategies
+- **Document Export**: jsPDF (PDF), docx (Word), file-saver (Download handling)
+- **Testing**: Vitest, React Testing Library, jsdom
 
 ---
 
@@ -169,6 +198,37 @@ interface Contact {
 - **Accuracy Test**: Upload diverse card samples (glossy, matte, handwritten).
 - **Latency Test**: Measure time-to-first-token (TTFT) for extraction.
 - **Mobile Responsiveness**: Verify PWA installability and camera access on iOS/Android.
+
+### Using the AI Research Assistant
+
+1. **Navigate to Research Page**: Click on "Research" in the navigation menu
+2. **Enter Topic**: Type your research topic in the input field (e.g., "Quantum Computing")
+3. **Generate**: Click "Generate Paper" button
+4. **Wait**: The AI will generate a comprehensive research paper in 10-30 seconds
+5. **Download**: Choose your preferred format:
+   - Click "Download PDF" for a professional PDF document
+   - Click "Download DOCX" for an editable Word document
+   - Click "Download Markdown" for a README-ready file
+
+### Running Tests
+
+Execute the test suite to ensure code quality:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode (during development)
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+The test suite includes:
+- Unit tests for components
+- Integration tests for AI functionality
+- Export functionality tests
 
 ---
 

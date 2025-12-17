@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import DashboardPage from './pages/DashboardPage';
 import ArViewPage from './pages/ArViewPage';
 import AdminPage from './pages/AdminPage';
+import ResearchPage from './pages/ResearchPage';
 import { User } from './types';
 import { auth, isFirebaseConfigured } from './firebaseConfig'; // Import Firebase auth and config check
 import { onAuthStateChanged, User as FirebaseUser, signInWithPopup, signOut, GoogleAuthProvider } from 'firebase/auth';
@@ -91,12 +92,14 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-neutral-light flex flex-col">
       <Navbar user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
+      {/* Firebase Config Warning hidden by request
       {!isFirebaseConfigured && (
         <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 container mx-auto mt-2" role="status">
           <p className="font-bold">{t('app.firebaseNotConfiguredAdmin')}</p>
           <p>{t('app.firebaseNotConfiguredAdminMessage')}</p>
         </div>
       )}
+      */}
       {authError && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 container mx-auto mt-2" role="alert">
           <p className="font-bold">{t('app.authErrorTitle')}</p>
@@ -107,6 +110,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/research" element={<ResearchPage />} />
           <Route path="/ar-view/:contactId" element={currentUser ? <ArViewPage /> : <Navigate to="/dashboard" />} />
           <Route path="/admin" element={currentUser ? <AdminPage /> : <Navigate to="/dashboard" />} />
           <Route path="*" element={

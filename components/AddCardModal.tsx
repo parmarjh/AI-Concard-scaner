@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, ChangeEvent, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import Papa from 'papaparse';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.min.mjs';
 import { Contact, OCRResult } from '../types';
@@ -163,7 +163,14 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
     setError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const genAI = new GoogleGenerativeAI(process.env.API_KEY);
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash-preview-04-17',
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      });
+
       // Ensure previewUrl is used for base64 data, as selectedImage might be null after camera capture if not explicitly re-set
       const base64Image = previewUrl!.split(',')[1];
       const mimeType = previewUrl!.substring(previewUrl!.indexOf(':') + 1, previewUrl!.indexOf(';'));
@@ -172,24 +179,19 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
       const imagePart = {
         inlineData: { mimeType: selectedImage?.type || mimeType, data: base64Image },
       };
-      const textPart = {
-        text: `Analyze this business card image and extract contact information.
-               This image may contain handwritten text (pen/pencil) or printed text.
-               Please do your best to decipher difficult handwriting.
-               Infer missing details if possible (e.g., derive website from email domain if clear).
-               Provide output as JSON: {'name' (string), 'title' (string), 'company' (string), 
-               'phone' (array of strings), 'email' (array of strings), 
-               'address' (string), 'website' (string), 'notes' (string)}. 
-               Omit fields not found. Focus on accuracy and completeness.`,
-      };
+      const prompt = `Analyze this business card image and extract contact information.
+             This image may contain handwritten text (pen/pencil) or printed text.
+             Please do your best to decipher difficult handwriting.
+             Infer missing details if possible (e.g., derive website from email domain if clear).
+             Provide output as JSON: {'name' (string), 'title' (string), 'company' (string), 
+             'phone' (array of strings), 'email' (array of strings), 
+             'address' (string), 'website' (string), 'notes' (string)}. 
+             Omit fields not found. Focus on accuracy and completeness.`;
 
-      const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview-04-17',
-        contents: { parts: [imagePart, textPart] },
-        config: { responseMimeType: "application/json" }
-      });
+      const result = await model.generateContent([imagePart, prompt]);
+      const response = await result.response;
 
-      let jsonStr = response.text.trim();
+      let jsonStr = response.text().trim();
       const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
       const match = jsonStr.match(fenceRegex);
       if (match && match[2]) jsonStr = match[2].trim();
@@ -284,25 +286,27 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
           return;
         }
 
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const textPart = {
-          text: `Extract contact information from the following text, which was extracted from a document.
-                 The text may be unstructured or containOCR errors.
-                 Infer missing details if possible (e.g., derive website from email domain).
-                 Provide output as JSON: {'name' (string), 'title' (string), 'company' (string), 
-                 'phone' (array of strings), 'email' (array of strings), 
-                 'address' (string), 'website' (string), 'notes' (string)}. 
-                 If a field is not found, omit it or return an empty string/array. Be concise.
-                 Text: \n${fullText}`,
-        };
-
-        const response: GenerateContentResponse = await ai.models.generateContent({
+        const genAI = new GoogleGenerativeAI(process.env.API_KEY);
+        const model = genAI.getGenerativeModel({
           model: 'gemini-2.5-flash-preview-04-17',
-          contents: { parts: [textPart] },
-          config: { responseMimeType: "application/json" }
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
         });
 
-        let jsonStr = response.text.trim();
+        const prompt = `Extract contact information from the following text, which was extracted from a document.
+               The text may be unstructured or containOCR errors.
+               Infer missing details if possible (e.g., derive website from email domain).
+               Provide output as JSON: {'name' (string), 'title' (string), 'company' (string), 
+               'phone' (array of strings), 'email' (array of strings), 
+               'address' (string), 'website' (string), 'notes' (string)}. 
+               If a field is not found, omit it or return an empty string/array. Be concise.
+               Text: \n${fullText}`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+
+        let jsonStr = response.text().trim();
         const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
         const match = jsonStr.match(fenceRegex);
         if (match && match[2]) jsonStr = match[2].trim();
