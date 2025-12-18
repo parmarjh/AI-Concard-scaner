@@ -238,7 +238,7 @@ If you encounter any issues with scanning accuracy or camera access:
 
 1.  Check your browser permissions for **Cameras**.
 2.  Ensure good lighting (RGB sensors require adequate lux).
-3.  Open an issue on the [GitHub Repository](https://github.com/parmarjh/AI-visiting-card-scaner/issues).
+3.  Open an issue on the [GitHub Repository](https://github.com/parmarjh/AI-Concard-scaner/issues).
 
 ---
 
@@ -251,6 +251,6 @@ If you use this project or its methodology, please cite:
   author = {Parmar, J.H.},
   title = {AI Concard Scanner: Multi-modal Business Card Intelligence},
   year = {2025},
-  url = {https://github.com/parmarjh/AI-visiting-card-scaner}
+  url = {https://github.com/parmarjh/AI-Concard-scaner}
 }
 ```
