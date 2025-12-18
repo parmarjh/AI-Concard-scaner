@@ -9,9 +9,11 @@ import { saveToGoogleContacts } from '../utils/googleContacts';
 
 interface ContactCardProps {
   contact: Contact;
+  onEdit?: (contact: Contact) => void;
+  onDelete?: (id: string) => void;
 }
 
-const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
+const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) => {
   const { t } = useTranslation();
   const [showQR, setShowQR] = React.useState(false);
   const [isSavingGoogle, setIsSavingGoogle] = React.useState(false);
@@ -79,6 +81,26 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact }) => {
 
       <div className="bg-neutral-light/50 p-3 border-t border-neutral-200">
         <div className="flex items-center justify-end space-x-2">
+          {onEdit && (
+            <button
+              onClick={() => onEdit(contact)}
+              className="flex items-center text-xs font-medium text-neutral-dark hover:text-primary bg-white hover:bg-neutral-light border border-neutral-300 px-3 py-1.5 rounded-md transition-colors mr-2"
+              title="Edit Contact"
+            >
+              <EditIcon className="w-4 h-4 mr-1.5" />
+              Edit
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => contact.id && onDelete(contact.id)}
+              className="flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-white hover:bg-red-50 border border-neutral-300 px-3 py-1.5 rounded-md transition-colors mr-2"
+              title="Delete Contact"
+            >
+              <DeleteIcon className="w-4 h-4 mr-1.5" />
+              Delete
+            </button>
+          )}
           <button
             onClick={handleGoogleSave}
             className="flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md transition-colors mr-2"

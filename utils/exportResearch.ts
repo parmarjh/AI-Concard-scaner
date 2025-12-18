@@ -4,6 +4,49 @@ import { saveAs } from 'file-saver';
 import { ResearchPaper } from './geminiGenerator';
 
 /**
+ * Sanitize filename to be safe for all operating systems
+ */
+function sanitizeFilename(title: string): string {
+    if (!title || title.trim() === '') {
+        return 'research_paper';
+    }
+
+    // Remove or replace problematic characters
+    return title
+        .trim()
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, '') // Remove invalid chars
+        .replace(/\s+/g, '_') // Replace spaces with underscores
+        .replace(/[^\w\-]/g, '') // Keep only alphanumeric, underscore, and hyphen
+        .toLowerCase()
+        .substring(0, 50) // Limit length
+        || 'research_paper'; // Fallback if everything is removed
+}
+
+/**
+ * Helper to download a Blob with a filename using manual anchor tag
+ * This avoids issues with file-saver in some environments/browsers
+ */
+function downloadBlob(blob: Blob, filename: string) {
+    // Create object URL
+    const url = URL.createObjectURL(blob);
+
+    // Create temporary anchor
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+
+    // Append to body (required for Firefox)
+    document.body.appendChild(link);
+
+    // Trigger download
+    link.click();
+
+    // Cleanup
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+/**
  * Export research paper as PDF
  */
 export async function exportAsPDF(paper: ResearchPaper): Promise<void> {
@@ -60,8 +103,12 @@ export async function exportAsPDF(paper: ResearchPaper): Promise<void> {
     });
 
     // Save PDF
-    const fileName = `${paper.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
-    doc.save(fileName);
+    const fileName = `${sanitizeFilename(paper.title)}.pdf`;
+    console.log('Exporting PDF with title:', paper.title, 'fileName:', fileName);
+
+    // Use manual download helper to ensure filename is respected
+    const blob = doc.output('blob');
+    downloadBlob(blob, fileName);
 }
 
 /**
@@ -160,8 +207,8 @@ export async function exportAsDOCX(paper: ResearchPaper): Promise<void> {
 
     // Generate and save
     const blob = await Packer.toBlob(doc);
-    const fileName = `${paper.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.docx`;
-    saveAs(blob, fileName);
+    const fileName = `${sanitizeFilename(paper.title)}.docx`;
+    downloadBlob(blob, fileName);
 }
 
 /**
@@ -196,6 +243,6 @@ export function exportAsMarkdown(paper: ResearchPaper): void {
 
     // Save as file
     const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
-    const fileName = `${paper.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.md`;
-    saveAs(blob, fileName);
+    const fileName = `${sanitizeFilename(paper.title)}.md`;
+    downloadBlob(blob, fileName);
 }

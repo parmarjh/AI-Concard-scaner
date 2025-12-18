@@ -4,6 +4,8 @@ import { PlusIcon, SearchIcon, InfoIcon } from '../components/icons';
 import AddCardModal from '../components/AddCardModal';
 import ContactCard from '../components/ContactCard';
 import { Contact } from '../types';
+import ActionToolbar from '../components/ActionToolbar';
+import { saveAs } from 'file-saver';
 
 const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -35,30 +37,69 @@ const DashboardPage: React.FC = () => {
   const filteredContacts = contacts.filter(contact =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (contact.company && contact.company.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (contact.title && contact.title.toLowerCase().includes(searchTerm.toLowerCase()))
+    (contact.title && contact.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (contact.notes && contact.notes.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const handleExportContacts = () => {
+    if (contacts.length === 0) {
+      alert("No contacts to save.");
+      return;
+    }
+    const headers = ["Name", "Title", "Company", "Phone", "Email", "Address", "Website", "Notes"];
+    const csvContent = [
+      headers.join(","),
+      ...contacts.map(c => [
+        `"${c.name || ''}"`,
+        `"${c.title || ''}"`,
+        `"${c.company || ''}"`,
+        `"${(c.phone || []).join('; ')}"`,
+        `"${(c.email || []).join('; ')}"`,
+        `"${c.address || ''}"`,
+        `"${c.website || ''}"`,
+        `"${c.notes || ''}"`
+      ].join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'contacts_backup.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleDeleteContact = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this contact?")) {
+      setContacts(prev => prev.filter(c => c.id !== id));
+    }
+  };
+
+  const handleEditContact = (contact: Contact) => {
+    // For now, prompt as a placeholder or complex implementation
+    alert(`Edit functionality for ${contact.name} coming soon!`);
+  };
 
   return (
     <div className="animate-fadeIn">
-      <header className="mb-8">
+      <header className="mb-6">
         <h1 className="text-4xl font-bold text-primary">{t('dashboard.title')}</h1>
         <p className="text-neutral-dark mt-2">{t('dashboard.subtitle')}</p>
       </header>
 
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="relative w-full sm:w-1/2 md:w-1/3">
-          <input
-            type="text"
-            placeholder={t('dashboard.searchPlaceholder')}
-            className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary transition-shadow"
-            aria-label={t('dashboard.searchLabel')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral">
-            <SearchIcon className="w-5 h-5" />
-          </div>
-        </div>
+      {/* New Action Toolbar */}
+      <ActionToolbar
+        onSearch={setSearchTerm}
+        searchTerm={searchTerm}
+        onExport={handleExportContacts}
+      />
+
+      <div className="mb-6 flex justify-end">
         <button
           onClick={() => setIsModalOpen(true)}
           className="bg-primary hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 ease-in-out flex items-center transform hover:scale-105"
@@ -82,15 +123,20 @@ const DashboardPage: React.FC = () => {
         </div>
       ) : (
         filteredContacts.length === 0 && searchTerm ? (
-            <div className="bg-white p-8 rounded-xl shadow-xl text-center">
-                <InfoIcon className="w-16 h-16 text-primary mx-auto mb-4" />
-                <h2 className="text-2xl font-semibold text-neutral-dark mb-3">{t('dashboard.noResultsTitle')}</h2>
-                <p className="text-neutral">{t('dashboard.noResultsMessage', { searchTerm })}</p>
-            </div>
+          <div className="bg-white p-8 rounded-xl shadow-xl text-center">
+            <InfoIcon className="w-16 h-16 text-primary mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold text-neutral-dark mb-3">{t('dashboard.noResultsTitle')}</h2>
+            <p className="text-neutral">{t('dashboard.noResultsMessage', { searchTerm })}</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredContacts.map(contact => (
-              <ContactCard key={contact.id} contact={contact} />
+              <ContactCard
+                key={contact.id}
+                contact={contact}
+                onDelete={handleDeleteContact}
+                onEdit={handleEditContact}
+              />
             ))}
           </div>
         )

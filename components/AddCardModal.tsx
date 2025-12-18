@@ -43,9 +43,13 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<CardFormData>({});
 
+  // Camera State
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -85,6 +89,27 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
     };
   }, [videoStream]);
 
+  // Fetch available video devices
+  const getVideoDevices = async () => {
+    try {
+      // Ensure permissions are granted first by requesting a stream
+      // This is often needed to get labels and full device list on first run
+      const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      initialStream.getTracks().forEach(track => track.stop());
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      setAvailableDevices(videoDevices);
+
+      if (videoDevices.length > 0 && !selectedDeviceId) {
+        // Default to the first one if not set, or prefer 'environment' if we could detect it (complex without labels sometimes)
+        setSelectedDeviceId(videoDevices[0].deviceId);
+      }
+    } catch (err) {
+      console.error("Error enumerating devices:", err);
+      // Continue without list if failing, openCamera fallback will handle it
+    }
+  };
 
   const handleClose = () => {
     resetState();
@@ -165,7 +190,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
     try {
       const genAI = new GoogleGenerativeAI(process.env.API_KEY);
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash-preview-04-17',
+        model: 'gemini-2.0-flash', // Corrected model
         generationConfig: {
           responseMimeType: "application/json"
         }
@@ -192,6 +217,8 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
       const response = await result.response;
 
       let jsonStr = response.text().trim();
+
+      // Basic cleanup if model didn't respect JSON mode perfectly (rare with 2.0-flash but possible)
       const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
       const match = jsonStr.match(fenceRegex);
       if (match && match[2]) jsonStr = match[2].trim();
@@ -288,7 +315,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
 
         const genAI = new GoogleGenerativeAI(process.env.API_KEY);
         const model = genAI.getGenerativeModel({
-          model: 'gemini-2.5-flash-preview-04-17',
+          model: 'gemini-2.0-flash', // Corrected model
           generationConfig: {
             responseMimeType: "application/json"
           }
@@ -353,35 +380,53 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
     handleClose();
   };
 
+  // Open camera with specific device ID if available
   const openCamera = async () => {
     setCameraError(null);
     setError(null);
     setSelectedImage(null); // Clear any selected file
     setPreviewUrl(null);    // Clear any file preview
 
+    // First, verify we have device list
+    if (availableDevices.length === 0) {
+      await getVideoDevices();
+    }
+
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }
-        });
+        // Construct constraints based on selection
+        const constraints: MediaStreamConstraints = {
+          video: selectedDeviceId
+            ? { deviceId: { exact: selectedDeviceId } }
+            : { facingMode: "environment" } // Fallback to environment preference
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         setVideoStream(stream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setIsCameraOpen(true);
-      } catch (err) {
-        console.error("Error accessing camera:", err);
-        // Fallback if environment facingMode fails or other error
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          setVideoStream(stream);
+
+        // Wait for video element to be ready
+        setTimeout(() => {
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
           }
+        }, 100);
+
+        setIsCameraOpen(true);
+      } catch (err: any) {
+        console.error("Error accessing camera:", err);
+        // Fallback retry with basic constraints if the specific one failed
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setVideoStream(stream);
+          setTimeout(() => {
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+            }
+          }, 100);
           setIsCameraOpen(true);
         } catch (fallbackErr: any) {
           console.error("Error accessing camera (fallback):", fallbackErr);
-          setCameraError(t('addCardModal.errorCameraAccess', { errorName: fallbackErr.name }));
+          setCameraError(t('addCardModal.errorCameraAccess', { errorName: fallbackErr.name || 'Unknown Error' }));
           setIsCameraOpen(false);
         }
       }
@@ -391,11 +436,59 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
     }
   };
 
+  const handleCameraChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const newDeviceId = e.target.value;
+    setSelectedDeviceId(newDeviceId);
+    // If camera is already open, restart it with new device
+    if (isCameraOpen) {
+      // Identify that we need to switch, simple close and open sequence
+      closeCamera();
+      // We need a slight delay to allow clean shutdown before reopening
+      // Updating selectedDeviceId state will trigger re-open logic if we structured it via useEffect, 
+      // but imperative is safer here to control the sequence.
+      setTimeout(() => {
+        // Update the logic to use the *new* ID, as state update might be async
+        // Actually for this flow, let's just create a helper that takes ID
+        openCameraWithId(newDeviceId);
+      }, 200);
+    }
+  };
+
+  const openCameraWithId = async (deviceId: string) => {
+    // logic similar to openCamera but forcing the ID
+    // To avoid duplicating logic, we rely on the state `selectedDeviceId` which we updated, 
+    // but inside the async handler we should use the param to be sure.
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: deviceId } }
+        });
+        setVideoStream(stream);
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        }, 100);
+        setIsCameraOpen(true);
+      } catch (err) {
+        console.error("Error switching camera:", err);
+        setCameraError("Could not switch camera.");
+      }
+    }
+  };
+
   const capturePhoto = async () => {
     setCameraError(null);
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
+
+      // Ensure video dimensions are available
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        setCameraError("Camera not ready yet. Please wait a moment.");
+        return;
+      }
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const context = canvas.getContext('2d');
@@ -422,6 +515,12 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
     }
   };
 
+  // Start device enumeration once
+  useEffect(() => {
+    if (isOpen) {
+      getVideoDevices();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -517,6 +616,24 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
                     >
                       <CameraIcon className="w-5 h-5 mr-2" /> {t('addCardModal.useCamera')}
                     </button>
+
+                    {/* Camera Selector (Only shown if devices available) */}
+                    {availableDevices.length > 1 && (
+                      <div className="mt-2 flex justify-center">
+                        <select
+                          value={selectedDeviceId}
+                          onChange={handleCameraChange}
+                          className="text-xs border border-neutral-300 rounded px-2 py-1 text-neutral-dark bg-white focus:ring-primary focus:border-primary"
+                        >
+                          <option value="">Auto Select Camera</option>
+                          {availableDevices.map((device, idx) => (
+                            <option key={device.deviceId} value={device.deviceId}>
+                              {device.label || `Camera ${idx + 1}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   {previewUrl && !selectedImage?.name.startsWith('camera_capture') && ( // Show preview if it's from file upload
@@ -536,6 +653,24 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
                     muted /* Muted is important for autoplay without user gesture */
                     className="w-full h-auto max-h-[300px] bg-neutral-dark rounded-md border border-neutral-300"
                   />
+
+                  {/* In-Camera Switcher */}
+                  {availableDevices.length > 1 && (
+                    <div className="flex justify-center mb-2">
+                      <select
+                        value={selectedDeviceId}
+                        onChange={handleCameraChange}
+                        className="text-xs border border-neutral-300 rounded px-2 py-1 bg-white opacity-80"
+                      >
+                        {availableDevices.map((device, idx) => (
+                          <option key={device.deviceId} value={device.deviceId}>
+                            {device.label || `Camera ${idx + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -555,7 +690,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
                 </div>
               )}
               {/* Show preview from camera capture after capture, before scan */}
-              {previewUrl && selectedImage?.name.startsWith('camera_capture') && !isCameraOpen && (
+              {previewUrl && selectedImage?.name?.startsWith('camera_capture') && !isCameraOpen && (
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-neutral-dark mb-1">{t('addCardModal.capturePreview')}</h3>
                   <img src={previewUrl} alt="Captured card preview" className="rounded-lg shadow-md max-h-48 w-auto mx-auto border" />

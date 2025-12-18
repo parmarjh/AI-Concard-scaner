@@ -12,6 +12,7 @@ const ResearchPage: React.FC = () => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [paper, setPaper] = useState<ResearchPaper | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [debugRaw, setDebugRaw] = useState<string | null>(null); // Debug state
 
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -20,12 +21,15 @@ const ResearchPage: React.FC = () => {
         setIsGenerating(true);
         setError(null);
         setPaper(null);
+        setDebugRaw(null);
 
         try {
             const result = await generateResearchPaper(topic);
             setPaper(result);
         } catch (err: any) {
+            console.error(err);
             setError(err.message);
+            // Attempt to capture raw response if possible (requires modifying generator to return it on error, simplified here)
         } finally {
             setIsGenerating(false);
         }

@@ -38,6 +38,8 @@ export async function generateResearchPaper(topic: string): Promise<ResearchPape
     For "developmentIdeas", suggest 3 innovative future development directions.
   `;
 
+    let jsonStr = "";
+
     try {
         // Get the generative model instance
         const model = genAI.getGenerativeModel({
@@ -52,12 +54,14 @@ export async function generateResearchPaper(topic: string): Promise<ResearchPape
         const response = await result.response;
 
         // Handle response
-        let jsonStr = response.text().trim();
+        jsonStr = response.text().trim();
 
-        // Clean code fences if any (though responseMimeType usually avoids this, sometimes model adds it)
+        // Clean code fences if any
         if (jsonStr.startsWith('```')) {
             jsonStr = jsonStr.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
         }
+
+        console.log("Gemini Raw Response:", jsonStr); // Debug log
 
         if (!jsonStr) throw new Error("Empty response from AI");
 
@@ -65,6 +69,8 @@ export async function generateResearchPaper(topic: string): Promise<ResearchPape
 
     } catch (error: any) {
         console.error("Gemini Generation Error:", error);
-        throw new Error(`Failed to generate paper: ${error.message || JSON.stringify(error)}`);
+        // Include raw response in error for debugging
+        const rawInfo = "Raw: " + (jsonStr || "empty").substring(0, 200) + "...";
+        throw new Error(`Failed to generate paper: ${error.message}. ${rawInfo}`);
     }
 }

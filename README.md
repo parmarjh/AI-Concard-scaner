@@ -86,11 +86,11 @@ The "3D" approach refers to the three dimensions of analysis: **Visual**, **Text
 Raw inference is mapped to a strict **JSON Schema** and synchronized:
 ```json
 {
-  "name": "Jane Doe",
-  "title": "Senior Engineer",
-  "company": "Tech Corp",
-  "email": ["jane@techcorp.com"],
-  "phone": ["+1-555-0123"]
+  "name": "Jatin parmar",
+  "title": "Senior AI Engineer",
+  "company": "Shiva ai llp",
+  "email": ["parmrjatin4911.com"],
+  "phone": ["+91-7016681896"]
 }
 ```
 *Data is accepted into the local PouchDB/Firestore and optionally pushed to Google Contacts.*
