@@ -25,14 +25,14 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "subtitle": "Dashboard",
+    "subtitle": "Overview",
     "searchPlaceholder": "Search contacts by name, company, title...",
     "searchLabel": "Search contacts",
-    "addNewCard": "Add NewCard",
-    "noContactsTitle": "ContactsTitle",
+    "addNewCard": "Add New Card",
+    "noContactsTitle": "No Contacts Yet",
     "noContactsMessage": "Start by adding your first visiting card to see it here.",
-    "addFirstCard": "AddFirstCard",
-    "noResultsTitle": "No Contacts Found",
+    "addFirstCard": "Add Your First Card",
+    "noResultsTitle": "No Results Found",
     "noResultsMessage": "No contacts match your search term \"{{searchTerm}}\". Try a different search."
   },
   "addCardModal": {

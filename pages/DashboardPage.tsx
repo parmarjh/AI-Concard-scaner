@@ -6,6 +6,7 @@ import ContactCard from '../components/ContactCard';
 import { Contact } from '../types';
 import ActionToolbar from '../components/ActionToolbar';
 import { saveAs } from 'file-saver';
+import { autoGenerateAvatar } from '../utils/avatarGenerator';
 
 const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -29,7 +30,14 @@ const DashboardPage: React.FC = () => {
     }
   }, [contacts]);
 
-  const handleAddContact = (newContact: Contact) => {
+  const handleAddContact = async (newContact: Contact) => {
+    // Auto-generate avatar if no image provided
+    if (!newContact.cardImageUrl) {
+      const avatarUrl = await autoGenerateAvatar({ name: newContact.name });
+      if (avatarUrl) {
+        newContact.cardImageUrl = avatarUrl;
+      }
+    }
     setContacts(prevContacts => [...prevContacts, newContact]);
     setIsModalOpen(false); // Close modal after adding
   };
@@ -85,6 +93,23 @@ const DashboardPage: React.FC = () => {
     alert(`Edit functionality for ${contact.name} coming soon!`);
   };
 
+  const handleGenerateAvatarAction = async (contactId: string) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) return;
+
+    try {
+      const avatarUrl = await autoGenerateAvatar(contact, 'personas');
+
+      if (avatarUrl) {
+        setContacts(prev => prev.map(c =>
+          c.id === contactId ? { ...c, cardImageUrl: avatarUrl, updatedAt: new Date().toISOString() } : c
+        ));
+      }
+    } catch (error) {
+      console.error("Error generating avatar:", error);
+    }
+  };
+
   return (
     <div className="animate-fadeIn">
       <header className="mb-6">
@@ -136,6 +161,7 @@ const DashboardPage: React.FC = () => {
                 contact={contact}
                 onDelete={handleDeleteContact}
                 onEdit={handleEditContact}
+                onGenerateAvatar={handleGenerateAvatarAction}
               />
             ))}
           </div>

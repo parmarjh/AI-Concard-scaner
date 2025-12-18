@@ -11,12 +11,14 @@ interface ContactCardProps {
   contact: Contact;
   onEdit?: (contact: Contact) => void;
   onDelete?: (id: string) => void;
+  onGenerateAvatar?: (id: string) => void;
 }
 
-const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) => {
+const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete, onGenerateAvatar }) => {
   const { t } = useTranslation();
   const [showQR, setShowQR] = React.useState(false);
   const [isSavingGoogle, setIsSavingGoogle] = React.useState(false);
+  const [isGeneratingAvatar, setIsGeneratingAvatar] = React.useState(false);
 
   const handleGoogleSave = async () => {
     if (isSavingGoogle) return;
@@ -24,6 +26,13 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
     const result = await saveToGoogleContacts(contact);
     alert(result.message);
     setIsSavingGoogle(false);
+  };
+
+  const handleGenerateAIPhoto = async () => {
+    if (!onGenerateAvatar || !contact.id) return;
+    setIsGeneratingAvatar(true);
+    await onGenerateAvatar(contact.id);
+    setIsGeneratingAvatar(false);
   };
 
   const displayInfo = (labelKey: 'email' | 'phone' | 'website' | 'address', value?: string | string[]) => {
@@ -109,6 +118,15 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
           >
             {isSavingGoogle ? <SpinnerIcon className="w-4 h-4 mr-1.5" /> : <GoogleIcon className="w-4 h-4 mr-1.5" />}
             Google
+          </button>
+          <button
+            onClick={handleGenerateAIPhoto}
+            className="flex items-center text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-md transition-colors mr-2"
+            title="Generate AI Photo"
+            disabled={isGeneratingAvatar || !onGenerateAvatar}
+          >
+            {isGeneratingAvatar ? <SpinnerIcon className="w-4 h-4 animate-spin mr-1.5" /> : <StarIcon className="w-4 h-4 mr-1.5" />}
+            AI Photo
           </button>
           <button
             onClick={() => setShowQR(true)}
