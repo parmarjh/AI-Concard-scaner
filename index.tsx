@@ -6,6 +6,7 @@ import './i18n'; // Import i18next configuration
 import { SpinnerIcon } from './components/icons';
 
 // Register Service Worker for PWA functionality
+/*
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js')
@@ -17,6 +18,7 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
+*/
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
