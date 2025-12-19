@@ -52,37 +52,47 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogin, onLogout }) => {
   };
 
   return (
-    <nav className="bg-primary shadow-lg sticky top-0 z-50">
-      <div className="container mx-auto px-4">
-        <div className="flex justify-between items-center h-16">
-          <Link to="/" className="text-white text-2xl font-bold hover:text-secondary transition-colors">
-            {t('navbar.title')}
+    <nav className="glass sticky top-0 z-[60] border-b border-white/20">
+      <div className="container mx-auto px-6">
+        <div className="flex justify-between items-center h-20">
+          <Link to="/" className="flex items-center space-x-2 group">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
+              <span className="text-white font-bold text-xl">A</span>
+            </div>
+            <span className="text-indigo-600 dark:text-indigo-400 text-2xl font-black tracking-tight group-hover:text-purple-600 transition-colors">
+              {t('navbar.title')}
+            </span>
           </Link>
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            <Link to="/dashboard" className="text-neutral-light hover:text-secondary transition-colors px-3 py-2 rounded-md text-sm font-medium">{t('navbar.dashboard')}</Link>
-            <Link to="/research" className="text-neutral-light hover:text-secondary transition-colors px-3 py-2 rounded-md text-sm font-medium flex items-center">
-              <FileTextIcon className="w-4 h-4 mr-1" />
-              Research
-            </Link>
+
+          <div className="flex items-center space-x-3 sm:space-x-6">
+            <div className="hidden lg:flex items-center space-x-2">
+              <Link to="/dashboard" className="text-slate-600 hover:text-indigo-600 transition-all px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-50">
+                {t('navbar.dashboard')}
+              </Link>
+              <Link to="/research" className="text-slate-600 hover:text-indigo-600 transition-all px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-50 flex items-center">
+                <FileTextIcon className="w-4 h-4 mr-2" />
+                Research
+              </Link>
+            </div>
+
+            <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
 
             {/* Language Switcher */}
             <div className="relative">
               <button
                 onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                className="p-2 text-neutral-light hover:text-secondary transition-colors focus:outline-none"
+                className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all focus:outline-none"
                 aria-label={t('navbar.language')}
               >
-                <GlobeIcon className="w-6 h-6" />
+                <GlobeIcon className="w-5 h-5" />
               </button>
               {langDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-36 bg-white rounded-md shadow-lg py-1 z-20 ring-1 ring-black ring-opacity-5">
+                <div className="absolute right-0 mt-3 w-40 glass rounded-2xl shadow-xl py-2 z-20 border border-white/20 animate-fadeIn overflow-hidden">
                   {Object.keys(languages).map((lng) => (
                     <button
                       key={lng}
-                      style={{ fontWeight: i18n.resolvedLanguage === lng ? 'bold' : 'normal' }}
-                      type="submit"
                       onClick={() => changeLanguage(lng)}
-                      className="block w-full text-left px-4 py-2 text-sm text-neutral-dark hover:bg-neutral-light"
+                      className={`block w-full text-left px-5 py-2.5 text-sm transition-colors ${i18n.resolvedLanguage === lng ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}
                     >
                       {(languages as any)[lng].nativeName}
                     </button>
@@ -91,57 +101,44 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogin, onLogout }) => {
               )}
             </div>
 
-            {user && (
+            {user ? (
               <>
-                <Link to="/admin" className="text-neutral-light hover:text-secondary transition-colors px-3 py-2 rounded-md text-sm font-medium hidden sm:flex items-center">
-                  <SettingsIcon className="w-5 h-5 mr-1" /> {t('navbar.admin')}
-                </Link>
                 <div className="relative">
                   <button
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    className="flex items-center text-neutral-light focus:outline-none"
-                    aria-expanded={userDropdownOpen}
-                    aria-haspopup="true"
-                    aria-label={t('navbar.userMenu')}
+                    className="flex items-center p-1 px-2 pr-3 bg-white/50 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-indigo-100 shadow-sm focus:outline-none"
                   >
                     {user.photoURL ? (
-                      <img src={user.photoURL} alt={user.displayName || 'User'} className="w-8 h-8 rounded-full mr-2 border-2 border-neutral-light" />
+                      <img src={user.photoURL} alt={user.displayName || 'User'} className="w-8 h-8 rounded-xl shadow-md" />
                     ) : (
-                      <UserIcon className="w-8 h-8 mr-2 rounded-full bg-neutral-light text-primary p-1" />
+                      <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
+                        {user.displayName?.[0] || 'U'}
+                      </div>
                     )}
-                    <span className="hidden md:inline">{user.displayName || 'User'}</span>
-                    <ChevronDownIcon className={`w-5 h-5 ml-1 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDownIcon className={`w-4 h-4 ml-2 text-slate-400 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {userDropdownOpen && (
-                    <div
-                      className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 ring-1 ring-black ring-opacity-5"
-                      role="menu"
-                      aria-orientation="vertical"
-                      aria-labelledby="user-menu-button"
-                    >
-                      <div className="px-4 py-2 text-sm text-neutral-dark border-b">
-                        <p className="font-semibold">{user.displayName || 'User'}</p>
-                        <p className="text-xs text-neutral truncate">{user.email}</p>
+                    <div className="absolute right-0 mt-3 w-56 glass rounded-2xl shadow-xl py-2 z-20 border border-white/20 animate-fadeIn overflow-hidden">
+                      <div className="px-5 py-3 border-b border-slate-100">
+                        <p className="font-bold text-slate-800 text-sm truncate">{user.displayName || 'User'}</p>
+                        <p className="text-xs text-slate-400 truncate">{user.email}</p>
                       </div>
                       <Link
                         to="/admin"
-                        className="block sm:hidden px-4 py-2 text-sm text-neutral-dark hover:bg-neutral-light w-full text-left flex items-center"
-                        role="menuitem"
+                        className="px-5 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center font-medium"
                         onClick={() => setUserDropdownOpen(false)}
                       >
-                        <SettingsIcon className="w-5 h-5 mr-2 text-primary" /> {t('navbar.admin')}
+                        <SettingsIcon className="w-4 h-4 mr-3" /> {t('navbar.admin')}
                       </Link>
                       <button
                         onClick={handleLogoutAttempt}
                         disabled={isAuthActionInProgress}
-                        className="block w-full text-left px-4 py-2 text-sm text-neutral-dark hover:bg-neutral-light flex items-center disabled:opacity-50"
-                        role="menuitem"
-                        aria-label={t('navbar.logout')}
+                        className="w-full text-left px-5 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-all flex items-center font-medium disabled:opacity-50"
                       >
-                        {isAuthActionInProgress && user ? ( // Show spinner only if logout is in progress
-                          <SpinnerIcon className="w-5 h-5 mr-2" />
+                        {isAuthActionInProgress ? (
+                          <SpinnerIcon className="w-4 h-4 mr-3 animate-spin" />
                         ) : (
-                          <LogoutIcon className="w-5 h-5 mr-2 text-red-500" />
+                          <LogoutIcon className="w-4 h-4 mr-3" />
                         )}
                         {t('navbar.logout')}
                       </button>
@@ -149,34 +146,15 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogin, onLogout }) => {
                   )}
                 </div>
               </>
-            )}
-            {!user && (
-              <div className="hidden sm:flex items-center space-x-2">
+            ) : (
+              <div className="flex items-center space-x-2">
                 <button
                   onClick={handleAuthAttempt}
                   disabled={isAuthActionInProgress}
-                  className="bg-white hover:bg-neutral-light text-primary font-semibold px-4 py-2 rounded-md text-sm flex items-center transition-colors shadow-sm hover:shadow-md disabled:opacity-70"
-                  aria-label="Login with Google"
+                  className="hidden sm:flex items-center px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-indigo-200 shadow-lg hover:shadow-indigo-300 transform hover:-translate-y-0.5 disabled:opacity-70"
                 >
-                  {isAuthActionInProgress ? (
-                    <SpinnerIcon className="w-5 h-5 mr-2 text-primary" />
-                  ) : (
-                    <GoogleIcon className="w-5 h-5 mr-2" />
-                  )}
+                  {isAuthActionInProgress ? <SpinnerIcon className="w-4 h-4 mr-2 animate-spin" /> : <GoogleIcon className="w-4 h-4 mr-2" />}
                   {t('navbar.login')}
-                </button>
-                <button
-                  onClick={handleAuthAttempt} // Same handler as Firebase handles new user creation
-                  disabled={isAuthActionInProgress}
-                  className="border border-white text-white hover:bg-white hover:text-primary font-semibold px-4 py-2 rounded-md text-sm flex items-center transition-colors shadow-sm hover:shadow-md disabled:opacity-70"
-                  aria-label="Sign Up with Google"
-                >
-                  {isAuthActionInProgress ? (
-                    <SpinnerIcon className="w-5 h-5 mr-2 text-white group-hover:text-primary" /> // Adjust spinner color if needed
-                  ) : (
-                    <GoogleIcon className="w-5 h-5 mr-2" />
-                  )}
-                  {t('navbar.signup')}
                 </button>
               </div>
             )}

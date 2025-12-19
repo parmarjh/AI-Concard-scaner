@@ -90,40 +90,38 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-light flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <Navbar user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
-      {/* Firebase Config Warning hidden by request
-      {!isFirebaseConfigured && (
-        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 container mx-auto mt-2" role="status">
-          <p className="font-bold">{t('app.firebaseNotConfiguredAdmin')}</p>
-          <p>{t('app.firebaseNotConfiguredAdminMessage')}</p>
-        </div>
-      )}
-      */}
+
       {authError && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 container mx-auto mt-2" role="alert">
+        <div className="glass border-l-4 border-red-500 text-red-700 p-4 container mx-auto mt-4 rounded-r-lg shadow-lg" role="alert">
           <p className="font-bold">{t('app.authErrorTitle')}</p>
           <p>{authError}</p>
         </div>
       )}
+
       <main className="flex-grow container mx-auto px-4 py-8">
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/research" element={<ResearchPage />} />
-          <Route path="/ar-view/:contactId" element={currentUser ? <ArViewPage /> : <Navigate to="/dashboard" />} />
-          <Route path="/admin" element={currentUser ? <AdminPage /> : <Navigate to="/dashboard" />} />
-          <Route path="*" element={
-            <div className="text-center py-10">
-              <h1 className="text-3xl font-bold text-primary mb-4">{t('app.pageNotFound')}</h1>
-              <p className="text-neutral-dark">{t('app.pageNotFoundMessage')}</p>
-              <img src="https://illustrations.popsy.co/red/timed-out.svg" alt="Page not found illustration" className="mx-auto mt-8 w-1/2 max-w-sm" />
-            </div>
-          } />
-        </Routes>
+        <div className="glass rounded-3xl p-6 md:p-10 shadow-2xl min-h-[70vh] mb-8">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/research" element={<ResearchPage />} />
+            <Route path="/ar-view/:contactId" element={currentUser ? <ArViewPage /> : <Navigate to="/dashboard" />} />
+            <Route path="/admin" element={currentUser ? <AdminPage /> : <Navigate to="/dashboard" />} />
+            <Route path="*" element={
+              <div className="text-center py-20 animate-fadeIn">
+                <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600 mb-6">{t('app.pageNotFound')}</h1>
+                <p className="text-slate-600 text-lg">{t('app.pageNotFoundMessage')}</p>
+                <img src="https://illustrations.popsy.co/indigo/product-launch.svg" alt="Page not found" className="mx-auto mt-12 w-3/4 max-w-sm" />
+              </div>
+            } />
+          </Routes>
+        </div>
       </main>
-      <footer className="bg-neutral-dark text-neutral-light text-center p-4 text-sm">
-        {t('app.footer', { year: new Date().getFullYear() })}
+
+      <footer className="glass border-t border-white/20 text-slate-600 text-center p-6 text-sm">
+        <p className="font-medium">{t('app.footer', { year: new Date().getFullYear() })}</p>
+        <p className="text-xs mt-1 text-slate-400">Built with Gemini AI & Modern Web Tech</p>
       </footer>
     </div>
   );

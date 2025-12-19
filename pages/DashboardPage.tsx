@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PlusIcon, SearchIcon, InfoIcon } from '../components/icons';
 import AddCardModal from '../components/AddCardModal';
+import DetailViewModal from '../components/DetailViewModal';
 import ContactCard from '../components/ContactCard';
 import { Contact } from '../types';
 import ActionToolbar from '../components/ActionToolbar';
@@ -11,6 +13,7 @@ import { autoGenerateAvatar } from '../utils/avatarGenerator';
 const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>(() => {
     try {
       const savedContacts = localStorage.getItem('contacts');
@@ -21,6 +24,8 @@ const DashboardPage: React.FC = () => {
     }
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [viewingContact, setViewingContact] = useState<Contact | null>(null);
 
   useEffect(() => {
     try {
@@ -30,16 +35,35 @@ const DashboardPage: React.FC = () => {
     }
   }, [contacts]);
 
-  const handleAddContact = async (newContact: Contact) => {
-    // Auto-generate avatar if no image provided
-    if (!newContact.cardImageUrl) {
-      const avatarUrl = await autoGenerateAvatar({ name: newContact.name });
-      if (avatarUrl) {
-        newContact.cardImageUrl = avatarUrl;
+  const handleAddContact = async (contactsInput: Contact | Contact[]) => {
+    const contactsArray = Array.isArray(contactsInput) ? contactsInput : [contactsInput];
+
+    // Process each contact (e.g., generate avatars)
+    const processedContacts = await Promise.all(contactsArray.map(async (contact) => {
+      if (!contact.cardImageUrl) {
+        const avatarUrl = await autoGenerateAvatar({ name: contact.name });
+        if (avatarUrl) {
+          return { ...contact, cardImageUrl: avatarUrl };
+        }
       }
-    }
-    setContacts(prevContacts => [...prevContacts, newContact]);
-    setIsModalOpen(false); // Close modal after adding
+      return contact;
+    }));
+
+    setContacts(prevContacts => {
+      const newContacts = [...prevContacts];
+      processedContacts.forEach(pc => {
+        const index = newContacts.findIndex(c => c.id === pc.id);
+        if (index !== -1) {
+          newContacts[index] = pc; // Update existing
+        } else {
+          newContacts.push(pc); // Add new
+        }
+      });
+      return newContacts;
+    });
+
+    setIsModalOpen(false);
+    setEditingContact(null);
   };
 
   const filteredContacts = contacts.filter(contact =>
@@ -70,16 +94,7 @@ const DashboardPage: React.FC = () => {
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', 'contacts_backup.csv');
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+    saveAs(blob, 'contacts_backup.csv');
   };
 
   const handleDeleteContact = (id: string) => {
@@ -89,8 +104,13 @@ const DashboardPage: React.FC = () => {
   };
 
   const handleEditContact = (contact: Contact) => {
-    // For now, prompt as a placeholder or complex implementation
-    alert(`Edit functionality for ${contact.name} coming soon!`);
+    setEditingContact(contact);
+    setIsModalOpen(true);
+  };
+
+  const handleViewContact = (contact: Contact) => {
+    setViewingContact(contact);
+    setIsDetailModalOpen(true);
   };
 
   const handleGenerateAvatarAction = async (contactId: string) => {
@@ -111,56 +131,70 @@ const DashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="animate-fadeIn">
-      <header className="mb-6">
-        <h1 className="text-4xl font-bold text-primary">{t('dashboard.title')}</h1>
-        <p className="text-neutral-dark mt-2">{t('dashboard.subtitle')}</p>
-      </header>
+    <div className="animate-fadeIn pb-12">
+      <header className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between space-y-4 md:space-y-0">
+        <div>
+          <h1 className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 tracking-tight">
+            {t('dashboard.title')}
+          </h1>
+          <p className="text-slate-400 font-medium text-lg mt-2">{t('dashboard.subtitle')}</p>
+        </div>
 
-      {/* New Action Toolbar */}
-      <ActionToolbar
-        onSearch={setSearchTerm}
-        searchTerm={searchTerm}
-        onExport={handleExportContacts}
-      />
-
-      <div className="mb-6 flex justify-end">
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-primary hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 ease-in-out flex items-center transform hover:scale-105"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-8 rounded-2xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] hover:shadow-[0_15px_35px_rgba(79,70,229,0.4)] transition-all flex items-center justify-center transform hover:-translate-y-1 active:scale-95"
           aria-label={t('dashboard.addNewCard')}
         >
-          <PlusIcon className="w-5 h-5 mr-2" /> {t('dashboard.addNewCard')}
+          <div className="bg-white/20 p-1.5 rounded-lg mr-3 shadow-inner">
+            <PlusIcon className="w-5 h-5 text-white" />
+          </div>
+          {t('dashboard.addNewCard')}
         </button>
+      </header>
+
+      {/* Action Toolbar */}
+      <div className="mb-10">
+        <ActionToolbar
+          onSearch={setSearchTerm}
+          searchTerm={searchTerm}
+          onExport={handleExportContacts}
+        />
       </div>
 
       {contacts.length === 0 ? (
-        <div className="bg-white p-8 rounded-xl shadow-xl text-center">
-          <h2 className="text-2xl font-semibold text-neutral-dark mb-3">{t('dashboard.noContactsTitle')}</h2>
-          <p className="text-neutral mb-6">{t('dashboard.noContactsMessage')}</p>
-          <img src="https://illustrations.popsy.co/red/graphic-design.svg" alt="No contacts illustration" className="mx-auto mt-4 w-1/2 max-w-xs" />
+        <div className="glass border border-white/40 p-16 rounded-[40px] shadow-2xl text-center relative overflow-hidden group">
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-colors"></div>
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-colors"></div>
+
+          <img src="https://illustrations.popsy.co/indigo/product-launch.svg" alt="Launch" className="mx-auto mb-8 w-64 transform group-hover:scale-105 transition-transform duration-700" />
+          <h2 className="text-3xl font-black text-slate-800 mb-4">{t('dashboard.noContactsTitle')}</h2>
+          <p className="text-slate-500 max-w-md mx-auto mb-10 text-lg leading-relaxed">{t('dashboard.noContactsMessage')}</p>
+
           <button
             onClick={() => setIsModalOpen(true)}
-            className="mt-8 bg-secondary hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:shadow-lg transition-all"
+            className="bg-white hover:bg-slate-50 text-indigo-600 font-black py-4 px-10 rounded-2xl shadow-xl hover:shadow-2xl transition-all border border-indigo-100"
           >
             {t('dashboard.addFirstCard')}
           </button>
         </div>
       ) : (
         filteredContacts.length === 0 && searchTerm ? (
-          <div className="bg-white p-8 rounded-xl shadow-xl text-center">
-            <InfoIcon className="w-16 h-16 text-primary mx-auto mb-4" />
-            <h2 className="text-2xl font-semibold text-neutral-dark mb-3">{t('dashboard.noResultsTitle')}</h2>
-            <p className="text-neutral">{t('dashboard.noResultsMessage', { searchTerm })}</p>
+          <div className="glass border border-white/40 p-16 rounded-[40px] shadow-2xl text-center">
+            <div className="w-24 h-24 bg-indigo-100/50 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+              <SearchIcon className="w-12 h-12 text-indigo-500" />
+            </div>
+            <h2 className="text-3xl font-black text-slate-800 mb-4">{t('dashboard.noResultsTitle')}</h2>
+            <p className="text-slate-500 text-lg">{t('dashboard.noResultsMessage', { searchTerm })}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {filteredContacts.map(contact => (
               <ContactCard
                 key={contact.id}
                 contact={contact}
                 onDelete={handleDeleteContact}
                 onEdit={handleEditContact}
+                onView={handleViewContact}
                 onGenerateAvatar={handleGenerateAvatarAction}
               />
             ))}
@@ -171,8 +205,17 @@ const DashboardPage: React.FC = () => {
       {isModalOpen && (
         <AddCardModal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => { setIsModalOpen(false); setEditingContact(null); }}
           onSave={handleAddContact}
+          initialContact={editingContact}
+        />
+      )}
+
+      {isDetailModalOpen && (
+        <DetailViewModal
+          isOpen={isDetailModalOpen}
+          onClose={() => { setIsDetailModalOpen(false); setViewingContact(null); }}
+          contact={viewingContact}
         />
       )}
     </div>

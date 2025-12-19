@@ -4,17 +4,18 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Contact } from '../types';
 import ContactQRCode from './ContactQRCode';
-import { ArIcon, EditIcon, DeleteIcon, UserIcon, StarIcon, QrCodeIcon, GoogleIcon, SpinnerIcon } from './icons';
+import { ArIcon, EditIcon, DeleteIcon, UserIcon, StarIcon, QrCodeIcon, GoogleIcon, SpinnerIcon, MapPinIcon, DocumentIcon, SearchIcon } from './icons';
 import { saveToGoogleContacts } from '../utils/googleContacts';
 
 interface ContactCardProps {
   contact: Contact;
   onEdit?: (contact: Contact) => void;
   onDelete?: (id: string) => void;
+  onView?: (contact: Contact) => void;
   onGenerateAvatar?: (id: string) => void;
 }
 
-const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete, onGenerateAvatar }) => {
+const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete, onView, onGenerateAvatar }) => {
   const { t } = useTranslation();
   const [showQR, setShowQR] = React.useState(false);
   const [isSavingGoogle, setIsSavingGoogle] = React.useState(false);
@@ -47,105 +48,143 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete, on
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out overflow-hidden flex flex-col">
-      <div className="p-5 flex-grow">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center">
+    <div
+      className="glass group relative rounded-3xl overflow-hidden transition-all duration-500 hover:shadow-[0_20px_50px_rgba(99,102,241,0.2)] hover:-translate-y-2 border border-white/40"
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+      <div className="p-6 relative">
+        <div className="flex items-center space-x-4 mb-6">
+          <div className="relative">
+            <div className="absolute inset-0 bg-indigo-200 blur-xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
             {contact.cardImageUrl ? (
-              <img src={contact.cardImageUrl} alt={contact.name} className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-primary/20" />
+              <img src={contact.cardImageUrl} alt={contact.name} className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md relative z-10" />
             ) : (
-              <div className="w-12 h-12 rounded-full mr-3 bg-primary/10 flex items-center justify-center text-primary">
-                <UserIcon className="w-6 h-6" />
+              <div className="w-16 h-16 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 relative z-10">
+                <UserIcon className="w-8 h-8" />
               </div>
             )}
-            <div>
-              <h3 className="text-lg font-semibold text-primary truncate" title={contact.name}>{contact.name}</h3>
-              {contact.title && <p className="text-sm text-neutral-dark truncate" title={contact.title}>{contact.title}</p>}
-            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xl font-bold text-slate-800 truncate leading-tight mb-1" title={contact.name}>{contact.name}</h3>
+            {contact.title && <p className="text-sm font-medium text-slate-400 truncate uppercase tracking-wider">{contact.title}</p>}
           </div>
         </div>
 
-        {contact.company && <p className="text-sm font-medium text-secondary mb-2 truncate" title={contact.company}>{contact.company}</p>}
+        {contact.company && (
+          <div className="mb-4 inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold uppercase tracking-widest">
+            {contact.company}
+          </div>
+        )}
 
-        <div className="space-y-1 text-sm">
-          {displayInfo("email", contact.email)}
-          {displayInfo("phone", contact.phone)}
+        <div className="space-y-3">
+          {contact.email && contact.email.length > 0 && (
+            <div className="flex items-center text-sm text-slate-500">
+              <span className="w-5 h-5 mr-3 flex items-center justify-center text-indigo-400 font-bold shrink-0">@</span>
+              <span className="truncate">{contact.email[0]}</span>
+            </div>
+          )}
+          {contact.phone && contact.phone.length > 0 && (
+            <div className="flex items-center text-sm text-slate-500">
+              <span className="w-5 h-5 mr-3 flex items-center justify-center text-indigo-400 shrink-0">☏</span>
+              <span className="truncate">{contact.phone[0]}</span>
+            </div>
+          )}
           {contact.website && (
-            <p className="text-xs text-neutral truncate">
-              <span className="font-medium">{t('contactCard.website')}:</span>
+            <div className="flex items-center text-sm">
+              <span className="w-5 h-5 mr-3 flex items-center justify-center text-indigo-400 shrink-0">🌐</span>
               <a
                 href={contact.website.startsWith('http') ? contact.website : `http://${contact.website}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:underline"
+                className="text-indigo-600 hover:text-indigo-700 font-medium truncate"
                 onClick={(e) => e.stopPropagation()}
               >
-                {contact.website}
+                {contact.website.replace(/^https?:\/\//, '')}
               </a>
-            </p>
+            </div>
           )}
-          {contact.address && <p className="text-xs text-neutral truncate" title={contact.address}><span className="font-medium">{t('contactCard.address')}:</span> {contact.address}</p>}
+          {contact.address && (
+            <div className="flex items-start text-sm text-slate-500">
+              <span className="w-5 h-5 mr-3 mt-0.5 flex items-center justify-center text-indigo-400 shrink-0">
+                <MapPinIcon className="w-4 h-4" />
+              </span>
+              <span className="line-clamp-2">{contact.address}</span>
+            </div>
+          )}
+          {contact.notes && (
+            <div className="mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 italic text-xs text-slate-500 line-clamp-2 relative group-hover:bg-indigo-50/30 transition-colors">
+              <div className="flex items-center gap-1.5 mb-1">
+                <DocumentIcon className="w-3 h-3 text-indigo-400" />
+                <span className="font-bold uppercase tracking-widest text-[8px]">Notes</span>
+              </div>
+              {contact.notes}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="bg-neutral-light/50 p-3 border-t border-neutral-200">
-        <div className="flex items-center justify-end space-x-2">
-          {onEdit && (
-            <button
-              onClick={() => onEdit(contact)}
-              className="flex items-center text-xs font-medium text-neutral-dark hover:text-primary bg-white hover:bg-neutral-light border border-neutral-300 px-3 py-1.5 rounded-md transition-colors mr-2"
-              title="Edit Contact"
-            >
-              <EditIcon className="w-4 h-4 mr-1.5" />
-              Edit
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={() => contact.id && onDelete(contact.id)}
-              className="flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-white hover:bg-red-50 border border-neutral-300 px-3 py-1.5 rounded-md transition-colors mr-2"
-              title="Delete Contact"
-            >
-              <DeleteIcon className="w-4 h-4 mr-1.5" />
-              Delete
-            </button>
-          )}
-          <button
-            onClick={handleGoogleSave}
-            className="flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md transition-colors mr-2"
-            title="Save to Google Contacts"
-            disabled={isSavingGoogle}
-          >
-            {isSavingGoogle ? <SpinnerIcon className="w-4 h-4 mr-1.5" /> : <GoogleIcon className="w-4 h-4 mr-1.5" />}
-            Google
-          </button>
+      <div className="px-6 py-4 bg-white/30 backdrop-blur-sm border-t border-white/20">
+        <div className="flex items-center justify-end space-x-1">
           <button
             onClick={handleGenerateAIPhoto}
-            className="flex items-center text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-md transition-colors mr-2"
+            className="p-2 text-purple-600 hover:bg-purple-50 rounded-xl transition-all"
             title="Generate AI Photo"
             disabled={isGeneratingAvatar || !onGenerateAvatar}
           >
-            {isGeneratingAvatar ? <SpinnerIcon className="w-4 h-4 animate-spin mr-1.5" /> : <StarIcon className="w-4 h-4 mr-1.5" />}
-            AI Photo
+            {isGeneratingAvatar ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <StarIcon className="w-5 h-5" />}
           </button>
+
           <button
             onClick={() => setShowQR(true)}
-            className="flex items-center text-xs font-medium text-primary hover:text-primary-dark bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors mr-2"
-            title="Show Barcode"
+            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+            title="Show QR Code"
           >
-            <QrCodeIcon className="w-4 h-4 mr-1.5" />
-            Code
+            <QrCodeIcon className="w-5 h-5" />
           </button>
+
           <Link
             to={`/ar-view/${contact.id}`}
-            className="flex items-center text-xs font-medium text-secondary hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-md transition-colors"
-            aria-label={t('contactCard.arViewLabel', { name: contact.name })}
+            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+            title="AR View"
           >
-            <ArIcon className="w-4 h-4 mr-1.5" />
-            {t('contactCard.arView')}
+            <ArIcon className="w-5 h-5" />
           </Link>
+
+          <div className="h-4 w-px bg-slate-200 mx-1"></div>
+
+          {onView && (
+            <button
+              onClick={() => onView(contact)}
+              className="p-2 text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
+              title="View Details"
+            >
+              <SearchIcon className="w-5 h-5" />
+            </button>
+          )}
+
+          {onEdit && (
+            <button
+              onClick={() => onEdit(contact)}
+              className="p-2 text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
+              title="Edit"
+            >
+              <EditIcon className="w-5 h-5" />
+            </button>
+          )}
+
+          {onDelete && (
+            <button
+              onClick={() => contact.id && onDelete(contact.id)}
+              className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+              title="Delete"
+            >
+              <DeleteIcon className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
+
       <ContactQRCode
         contact={contact}
         isOpen={showQR}

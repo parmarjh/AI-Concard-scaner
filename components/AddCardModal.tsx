@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Papa from 'papaparse';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.min.mjs';
+import { BrowserMultiFormatReader } from '@zxing/library';
 import { Contact, OCRResult } from '../types';
-import { UploadIcon, ScanIcon, SpinnerIcon, CloseIcon, UserIcon, EditIcon, FileTextIcon, ImageFileIcon, CameraIcon } from './icons';
+import { UploadIcon, ScanIcon, SpinnerIcon, CloseIcon, UserIcon, EditIcon, FileTextIcon, ImageFileIcon, CameraIcon, QrCodeIcon } from './icons';
 
 // pdf.js worker setup
 if (typeof window !== 'undefined') {
@@ -15,7 +16,8 @@ if (typeof window !== 'undefined') {
 interface AddCardModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (contact: Contact) => void;
+  onSave: (contacts: Contact | Contact[]) => void;
+  initialContact?: Contact | null;
 }
 
 interface CardFormData {
@@ -31,15 +33,17 @@ interface CardFormData {
 
 type UploadMode = 'image' | 'file';
 
-const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) => {
+const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave, initialContact }) => {
   const { t } = useTranslation();
   const [uploadMode, setUploadMode] = useState<UploadMode>('image');
   const [step, setStep] = useState(1); // 1: Upload/Select, 2: Review
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [selectedDocumentFile, setSelectedDocumentFile] = useState<File | null>(null);
+  const [selectedDocumentFiles, setSelectedDocumentFiles] = useState<File[]>([]);
   const [extractedData, setExtractedData] = useState<Partial<OCRResult>>({});
+  const [bulkContacts, setBulkContacts] = useState<Contact[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isScanningQR, setIsScanningQR] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<CardFormData>({});
 
@@ -47,26 +51,33 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+
+  useEffect(() => {
+    if (initialContact) {
+      setFormData({
+        name: initialContact.name,
+        title: initialContact.title,
+        company: initialContact.company,
+        phone: initialContact.phone?.join(', '),
+        email: initialContact.email?.join(', '),
+        address: initialContact.address,
+        website: initialContact.website,
+        notes: initialContact.notes,
+      });
+      setPreviewUrl(initialContact.cardImageUrl || null);
+      setStep(2);
+    } else {
+      setStep(1);
+      setFormData({});
+      setPreviewUrl(null);
+    }
+  }, [initialContact]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-
-  const resetState = useCallback(() => {
-    setStep(1);
-    setSelectedImage(null);
-    setPreviewUrl(null);
-    setSelectedDocumentFile(null);
-    setExtractedData({});
-    setIsProcessing(false);
-    setError(null);
-    setFormData({});
-    closeCamera(); // Ensure camera is closed
-    setCameraError(null);
-    // setUploadMode('image'); // Optionally reset mode, or keep user's last choice
-  }, []); // Added closeCamera to dependency if it's defined outside or memoized
 
   const closeCamera = useCallback(() => {
     if (videoStream) {
@@ -79,6 +90,19 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
     }
   }, [videoStream]);
 
+  const resetState = useCallback(() => {
+    setStep(1);
+    setSelectedImage(null);
+    setPreviewUrl(null);
+    setSelectedDocumentFiles([]);
+    setBulkContacts([]);
+    setExtractedData({});
+    setIsProcessing(false);
+    setError(null);
+    setFormData({});
+    closeCamera();
+    setCameraError(null);
+  }, [closeCamera]);
 
   useEffect(() => {
     // Cleanup stream on component unmount or when modal is closed
@@ -122,7 +146,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
     const file = event.target.files?.[0];
     if (file) {
       setSelectedImage(file);
-      setSelectedDocumentFile(null); // Clear other file type
+      setSelectedDocumentFiles([]); // Clear other file type
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviewUrl(reader.result as string);
@@ -137,36 +161,94 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
   const handleDocumentFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setError(null);
     setCameraError(null);
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.type === 'text/csv' || file.type === 'application/pdf') {
-        setSelectedDocumentFile(file);
+    const files = event.target.files ? Array.from(event.target.files) as File[] : [];
+    if (files.length > 0) {
+      const validFiles = files.filter((file: File) => {
+        const name = file.name.toLowerCase();
+        return name.endsWith('.csv') || name.endsWith('.pdf') || file.type === 'text/csv' || file.type === 'application/pdf';
+      });
+
+      if (validFiles.length > 0) {
+        setSelectedDocumentFiles(validFiles);
         setSelectedImage(null); // Clear other file type
         setPreviewUrl(null); // Clear image preview
       } else {
         setError(t('addCardModal.errorUnsupportedFile'));
-        setSelectedDocumentFile(null);
       }
     } else {
-      setSelectedDocumentFile(null);
+      setSelectedDocumentFiles([]);
     }
   };
 
   const processAndDisplayParsedData = (parsedResult: Partial<OCRResult>, sourceFilename?: string) => {
     setExtractedData(parsedResult);
     const initialFormData: CardFormData = {
-      name: parsedResult.name,
-      title: parsedResult.title,
-      company: parsedResult.company,
-      phone: parsedResult.phone ? parsedResult.phone.join(', ') : '',
-      email: parsedResult.email ? parsedResult.email.join(', ') : '',
-      address: parsedResult.address,
-      website: parsedResult.website,
-      notes: parsedResult.notes || (sourceFilename ? `Source: ${sourceFilename}` : ''),
+      name: parsedResult.name || '',
+      title: parsedResult.title || '',
+      company: parsedResult.company || '',
+      phone: (parsedResult.phone && parsedResult.phone.length > 0) ? parsedResult.phone.join(', ') : '',
+      email: (parsedResult.email && parsedResult.email.length > 0) ? parsedResult.email.join(', ') : '',
+      address: parsedResult.address || '',
+      website: parsedResult.website || '',
+      notes: [parsedResult.notes, sourceFilename ? `Source: ${sourceFilename}` : ''].filter(Boolean).join('\n'),
     };
     setFormData(initialFormData);
     setStep(2);
-    // Preview URL is already set if it's from camera or file upload
+  };
+
+  const removeBulkContact = (index: number) => {
+    setBulkContacts(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const parseVCard = (vcard: string): Partial<OCRResult> => {
+    const result: Partial<OCRResult> = {};
+    const lines = vcard.split(/\r?\n/);
+    lines.forEach(line => {
+      if (line.startsWith('FN:') || line.startsWith('NAME:')) result.name = line.substring(line.indexOf(':') + 1).trim();
+      if (line.startsWith('ORG:')) result.company = line.substring(line.indexOf(':') + 1).trim();
+      if (line.startsWith('TITLE:')) result.title = line.substring(line.indexOf(':') + 1).trim();
+      if (line.startsWith('TEL')) {
+        const val = line.substring(line.indexOf(':') + 1).trim();
+        if (val) result.phone = [...(result.phone || []), val];
+      }
+      if (line.startsWith('EMAIL')) {
+        const val = line.substring(line.indexOf(':') + 1).trim();
+        if (val) result.email = [...(result.email || []), val];
+      }
+      if (line.startsWith('ADR:')) result.address = line.substring(line.indexOf(':') + 1).replace(/;/g, ' ').trim();
+      if (line.startsWith('URL:')) result.website = line.substring(line.indexOf(':') + 1).trim();
+      if (line.startsWith('NOTE:')) result.notes = line.substring(line.indexOf(':') + 1).trim();
+    });
+    return result;
+  };
+
+  const startQrScanner = async () => {
+    if (!videoRef.current) return;
+    setIsScanningQR(true);
+    const codeReader = new BrowserMultiFormatReader();
+    try {
+      const result = await codeReader.decodeFromVideoElement(videoRef.current);
+      if (result) {
+        const text = result.getText();
+        let parsed: Partial<OCRResult> = {};
+        if (text.includes('BEGIN:VCARD')) {
+          parsed = parseVCard(text);
+        } else {
+          parsed = { notes: `Scanned Code: ${text}` };
+          if (text.includes('@') && !text.includes(' ')) parsed.email = [text];
+          else if (/^\+?[\d\s-]{7,}$/.test(text)) parsed.phone = [text];
+          else if (text.startsWith('http')) parsed.website = text;
+        }
+        processAndDisplayParsedData(parsed, 'QR/Barcode Scan');
+        setIsScanningQR(false);
+        codeReader.reset();
+        closeCamera();
+      }
+    } catch (err) {
+      if (isScanningQR) {
+        console.log("QR Scan attempt finished or failed.");
+      }
+    }
   };
 
   const handleScanImage = async () => {
@@ -204,14 +286,13 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
       const imagePart = {
         inlineData: { mimeType: selectedImage?.type || mimeType, data: base64Image },
       };
-      const prompt = `Analyze this business card image and extract contact information.
-             This image may contain handwritten text (pen/pencil) or printed text.
-             Please do your best to decipher difficult handwriting.
-             Infer missing details if possible (e.g., derive website from email domain if clear).
-             Provide output as JSON: {'name' (string), 'title' (string), 'company' (string), 
-             'phone' (array of strings), 'email' (array of strings), 
-             'address' (string), 'website' (string), 'notes' (string)}. 
-             Omit fields not found. Focus on accuracy and completeness.`;
+      const prompt = `Carefully transcribe ALL text from this business card and organize into JSON.
+             - Decipher handwriting if present.
+             - Organize as: {name, title, company, phone:[], email:[], address, website, notes}.
+             - For fields not found, use "".
+             - If you see a logo with a company name, extract it.
+             - Look for social media links and put them in notes.
+             - Output MUST be valid JSON.`;
 
       const result = await model.generateContent([imagePart, prompt]);
       const response = await result.response;
@@ -243,108 +324,115 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
       setError(t('addCardModal.errorOffline'));
       return;
     }
-    if (!selectedDocumentFile) {
+    if (selectedDocumentFiles.length === 0) {
       setError(t('addCardModal.errorNoDocument'));
       return;
     }
     setIsProcessing(true);
     setError(null);
 
+    const allExtractedContacts: Contact[] = [];
+
     try {
-      if (selectedDocumentFile.type === 'text/csv') {
-        Papa.parse(selectedDocumentFile, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            if (results.errors.length > 0) {
-              console.error("CSV Parsing errors:", results.errors);
-              setError(t('addCardModal.errorCsvParse', { message: results.errors[0].message }));
-              setIsProcessing(false);
-              return;
-            }
-            if (results.data.length === 0) {
-              setError(t('addCardModal.errorCsvEmpty'));
-              setIsProcessing(false);
-              return;
-            }
-            const firstRow = results.data[0] as any;
-            // Basic mapping - can be made more sophisticated
-            const mappedData: Partial<OCRResult> = {
-              name: firstRow.Name || firstRow.name || firstRow["Full Name"],
-              title: firstRow.Title || firstRow.title,
-              company: firstRow.Company || firstRow.company,
-              phone: firstRow.Phone || firstRow.phone ? String(firstRow.Phone || firstRow.phone).split(',').map(p => p.trim()) : [],
-              email: firstRow.Email || firstRow.email ? String(firstRow.Email || firstRow.email).split(',').map(e => e.trim()) : [],
-              address: firstRow.Address || firstRow.address,
-              website: firstRow.Website || firstRow.website || firstRow.URL,
-              notes: firstRow.Notes || firstRow.notes,
-            };
-            if (results.data.length > 1) {
-              console.warn(`CSV contains multiple contacts (${results.data.length} rows). Processing the first one.`);
-            }
-            processAndDisplayParsedData(mappedData, selectedDocumentFile.name);
+      for (const file of selectedDocumentFiles) {
+        const name = file.name.toLowerCase();
+        const isCsv = name.endsWith('.csv') || file.type === 'text/csv';
+        const isPdf = name.endsWith('.pdf') || file.type === 'application/pdf';
+
+        if (isCsv) {
+          await new Promise<void>((resolve, reject) => {
+            Papa.parse(file, {
+              header: true,
+              skipEmptyLines: true,
+              transformHeader: (h) => h.toLowerCase().trim().replace(/[^a-z0-9]/g, ''),
+              complete: (results) => {
+                results.data.forEach((row: any) => {
+                  const findField = (keys: string[]) => {
+                    for (const k of keys) {
+                      if (row[k]) return row[k];
+                      const matchedKey = Object.keys(row).find(h => h.includes(k));
+                      if (matchedKey && row[matchedKey]) return row[matchedKey];
+                    }
+                    return '';
+                  };
+
+                  let contactName = findField(['name', 'fullname', 'displayname', 'person', 'contactperson', 'entryname']);
+                  if (!contactName) {
+                    const first = findField(['given', 'first', 'fname']);
+                    const last = findField(['family', 'last', 'lname']);
+                    contactName = [first, last].filter(Boolean).join(' ');
+                  }
+
+                  if (contactName) {
+                    allExtractedContacts.push({
+                      id: crypto.randomUUID(),
+                      name: contactName,
+                      title: findField(['title', 'job', 'position', 'role', 'designation']),
+                      company: findField(['company', 'organization', 'firm', 'business', 'org']),
+                      phone: (findField(['phone', 'mobile', 'tel', 'cell', 'mob']) || '').toString().split(/[;,]/).map((p: any) => p.trim()).filter(Boolean),
+                      email: (findField(['email', 'mail', 'mailbox', 'emailid']) || '').toString().split(/[;,]/).map((e: any) => e.trim()).filter(Boolean),
+                      address: findField(['address', 'location', 'street', 'city', 'addr', 'loc']),
+                      website: findField(['website', 'url', 'site', 'web', 'www']),
+                      notes: findField(['notes', 'comments', 'desc', 'info', 'remarks']) || `Source: ${file.name}`,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                    });
+                  }
+                });
+                resolve();
+              },
+              error: (err) => reject(err)
+            });
+          });
+        } else if (isPdf) {
+          // Simplified PDF extraction, one contact per file for now through AI
+          if (!process.env.API_KEY) {
+            setError(t('addCardModal.errorApiKey'));
+            console.error("Gemini API Key (process.env.API_KEY) is missing.");
             setIsProcessing(false);
-          },
-          error: (error: any) => {
-            console.error("Error parsing CSV:", error);
-            setError(t('addCardModal.errorCsvParse', { message: error.message }));
-            setIsProcessing(false);
+            return;
           }
-        });
-      } else if (selectedDocumentFile.type === 'application/pdf') {
-        if (!process.env.API_KEY) {
-          setError(t('addCardModal.errorApiKey'));
-          console.error("Gemini API Key (process.env.API_KEY) is missing.");
-          setIsProcessing(false);
-          return;
-        }
-        const arrayBuffer = await selectedDocumentFile.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let fullText = '';
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
-        }
-
-        if (!fullText.trim()) {
-          setError(t('addCardModal.errorPdfText'));
-          setIsProcessing(false);
-          return;
-        }
-
-        const genAI = new GoogleGenerativeAI(process.env.API_KEY);
-        const model = genAI.getGenerativeModel({
-          model: 'gemini-2.0-flash', // Corrected model
-          generationConfig: {
-            responseMimeType: "application/json"
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          let fullText = '';
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            fullText += content.items.map((item: any) => item.str).join(' ') + '\n';
           }
-        });
 
-        const prompt = `Extract contact information from the following text, which was extracted from a document.
-               The text may be unstructured or containOCR errors.
-               Infer missing details if possible (e.g., derive website from email domain).
-               Provide output as JSON: {'name' (string), 'title' (string), 'company' (string), 
-               'phone' (array of strings), 'email' (array of strings), 
-               'address' (string), 'website' (string), 'notes' (string)}. 
-               If a field is not found, omit it or return an empty string/array. Be concise.
-               Text: \n${fullText}`;
+          if (fullText.trim()) {
+            const genAI = new GoogleGenerativeAI(process.env.API_KEY!);
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', generationConfig: { responseMimeType: "application/json" } });
+            const prompt = `Extract contact information from this text. Return strictly JSON: {'name', 'title', 'company', 'phone'[], 'email'[], 'address', 'website', 'notes'}. Text: \n${fullText}`;
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            const data: OCRResult = JSON.parse(response.text().trim().replace(/^```json/, '').replace(/```$/, ''));
+            if (data.name) {
+              allExtractedContacts.push({
+                ...data,
+                id: crypto.randomUUID(),
+                name: data.name!,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              } as Contact);
+            }
+          }
+        }
+      }
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-
-        let jsonStr = response.text().trim();
-        const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-        const match = jsonStr.match(fenceRegex);
-        if (match && match[2]) jsonStr = match[2].trim();
-
-        const parsedResult: OCRResult = JSON.parse(jsonStr);
-        processAndDisplayParsedData(parsedResult, selectedDocumentFile.name);
-        setIsProcessing(false);
+      if (allExtractedContacts.length === 1 && !selectedDocumentFiles.some(f => f.name.toLowerCase().endsWith('.csv'))) {
+        processAndDisplayParsedData(allExtractedContacts[0], selectedDocumentFiles[0].name);
+      } else if (allExtractedContacts.length > 0) {
+        setBulkContacts(allExtractedContacts);
+        setStep(2);
+      } else {
+        setError(t('addCardModal.errorNoDataFound'));
       }
     } catch (err: any) {
-      console.error("Error processing document:", err);
+      console.error("Error processing documents:", err);
       setError(t('addCardModal.errorDocProcess', { message: err.message || '' }));
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -355,28 +443,32 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
   };
 
   const handleSaveContact = () => {
-    if (!formData.name) {
-      setError(t('addCardModal.errorNameRequired'));
-      return;
-    }
-    const currentPreviewUrl = (uploadMode === 'image' || isCameraOpen || selectedImage) ? previewUrl : undefined;
+    if (bulkContacts.length > 0) {
+      onSave(bulkContacts);
+    } else {
+      if (!formData.name) {
+        setError(t('addCardModal.errorNameRequired'));
+        return;
+      }
+      const currentPreviewUrl = (uploadMode === 'image' || isCameraOpen || selectedImage) ? previewUrl : undefined;
 
-    const newContact: Contact = {
-      id: crypto.randomUUID(),
-      name: formData.name || '',
-      title: formData.title,
-      company: formData.company,
-      phone: formData.phone ? formData.phone.split(',').map(p => p.trim()).filter(p => p) : undefined,
-      email: formData.email ? formData.email.split(',').map(e => e.trim()).filter(e => e) : undefined,
-      address: formData.address,
-      website: formData.website,
-      notes: formData.notes,
-      cardImageUrl: currentPreviewUrl,
-      isFavorite: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    onSave(newContact);
+      const newContact: Contact = {
+        id: initialContact?.id || crypto.randomUUID(),
+        name: formData.name || '',
+        title: formData.title,
+        company: formData.company,
+        phone: formData.phone ? formData.phone.split(',').map(p => p.trim()).filter(Boolean) : undefined,
+        email: formData.email ? formData.email.split(',').map(e => e.trim()).filter(Boolean) : undefined,
+        address: formData.address,
+        website: formData.website,
+        notes: formData.notes,
+        cardImageUrl: currentPreviewUrl || undefined,
+        isFavorite: initialContact?.isFavorite || false,
+        createdAt: initialContact?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      onSave(newContact);
+    }
     handleClose();
   };
 
@@ -431,7 +523,11 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
         }
       }
     } else {
-      setCameraError(t('addCardModal.errorCameraSupport'));
+      if (!window.isSecureContext) {
+        setCameraError(t('addCardModal.errorInsecureContext'));
+      } else {
+        setCameraError(t('addCardModal.errorCameraSupport'));
+      }
       setIsCameraOpen(false);
     }
   };
@@ -441,39 +537,8 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
     setSelectedDeviceId(newDeviceId);
     // If camera is already open, restart it with new device
     if (isCameraOpen) {
-      // Identify that we need to switch, simple close and open sequence
       closeCamera();
-      // We need a slight delay to allow clean shutdown before reopening
-      // Updating selectedDeviceId state will trigger re-open logic if we structured it via useEffect, 
-      // but imperative is safer here to control the sequence.
-      setTimeout(() => {
-        // Update the logic to use the *new* ID, as state update might be async
-        // Actually for this flow, let's just create a helper that takes ID
-        openCameraWithId(newDeviceId);
-      }, 200);
-    }
-  };
-
-  const openCameraWithId = async (deviceId: string) => {
-    // logic similar to openCamera but forcing the ID
-    // To avoid duplicating logic, we rely on the state `selectedDeviceId` which we updated, 
-    // but inside the async handler we should use the param to be sure.
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: deviceId } }
-        });
-        setVideoStream(stream);
-        setTimeout(() => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-        }, 100);
-        setIsCameraOpen(true);
-      } catch (err) {
-        console.error("Error switching camera:", err);
-        setCameraError("Could not switch camera.");
-      }
+      setTimeout(() => openCamera(), 100);
     }
   };
 
@@ -530,34 +595,39 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]"
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[100] animate-fadeIn"
       role="dialog"
       aria-modal="true"
       aria-labelledby="addCardModalTitle"
     >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between p-4 sm:p-6 border-b border-neutral-200">
-          <h2 id="addCardModalTitle" className="text-xl sm:text-2xl font-semibold text-primary">
-            {step === 1 ? t('addCardModal.titleStep1') : t('addCardModal.titleStep2')}
-          </h2>
+      <div className="glass-dark border border-white/10 rounded-[40px] shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden animate-zoomIn">
+        <header className="flex items-center justify-between p-8 border-b border-white/5">
+          <div>
+            <h2 id="addCardModalTitle" className="text-3xl font-black text-white tracking-tight">
+              {initialContact ? t('addCardModal.titleEdit') : (step === 1 ? t('addCardModal.titleStep1') : (bulkContacts.length > 0 ? t('addCardModal.bulkReview') : t('addCardModal.titleStep2')))}
+            </h2>
+            <p className="text-indigo-300/60 text-sm font-bold uppercase tracking-widest mt-1">
+              {initialContact ? t('addCardModal.subtitleEdit') : (step === 1 ? 'Source Acquisition' : (bulkContacts.length > 0 ? t('addCardModal.contactsFound', { count: bulkContacts.length }) : 'Information Review'))}
+            </p>
+          </div>
           <button
             onClick={handleClose}
-            className="text-neutral hover:text-red-500 transition-colors"
+            className="p-3 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-2xl transition-all"
             aria-label={t('addCardModal.close')}
           >
-            <CloseIcon className="w-7 h-7" />
+            <CloseIcon className="w-6 h-6" />
           </button>
         </header>
 
-        <main className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
+        <main className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
           {step === 1 && (
-            <div className="mb-4 flex border border-neutral-300 rounded-lg p-1 bg-neutral-light/50">
+            <div className="flex bg-white/5 p-1.5 rounded-3xl border border-white/5">
               {(['image', 'file'] as UploadMode[]).map(mode => (
                 <button
                   key={mode}
-                  onClick={() => { setUploadMode(mode); setError(null); setCameraError(null); setSelectedImage(null); setSelectedDocumentFile(null); setPreviewUrl(null); closeCamera(); }}
-                  className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all duration-200 ease-in-out flex items-center justify-center gap-2
-                    ${uploadMode === mode ? 'bg-primary text-white shadow' : 'text-neutral-dark hover:bg-neutral-200'}`}
+                  onClick={() => { setUploadMode(mode); setError(null); setCameraError(null); setSelectedImage(null); setSelectedDocumentFiles([]); setPreviewUrl(null); closeCamera(); }}
+                  className={`flex-1 py-4 px-6 rounded-[22px] text-sm font-black transition-all duration-300 flex items-center justify-center gap-3
+                    ${uploadMode === mode ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
                 >
                   {mode === 'image' ? <ImageFileIcon className="w-5 h-5" /> : <FileTextIcon className="w-5 h-5" />}
                   {mode === 'image' ? t('addCardModal.scanImage') : t('addCardModal.uploadDocument')}
@@ -566,201 +636,224 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
             </div>
           )}
 
-          <canvas ref={canvasRef} className="hidden"></canvas> {/* Hidden canvas for image capture */}
+          <canvas ref={canvasRef} className="hidden"></canvas>
 
           {error && (
-            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded-md text-sm" role="alert">
-              <p className="font-bold">{t('addCardModal.errorTitle')}</p>
-              <p>{error}</p>
+            <div className="p-5 bg-red-400/10 border border-red-400/20 text-red-400 rounded-3xl text-sm font-bold flex items-center animate-shake">
+              <span className="mr-3 text-xl">⚠️</span> {error}
             </div>
           )}
           {cameraError && step === 1 && uploadMode === 'image' && (
-            <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 rounded-md text-sm" role="alert">
-              <p className="font-bold">{t('addCardModal.cameraIssueTitle')}</p>
-              <p>{cameraError}</p>
+            <div className="p-5 bg-amber-400/10 border border-amber-400/20 text-amber-400 rounded-3xl text-sm font-bold flex items-center">
+              <span className="mr-3 text-xl">💡</span> {cameraError}
             </div>
           )}
 
-
           {step === 1 && uploadMode === 'image' && (
             <>
-              {!isCameraOpen ? (
-                <>
-                  <div className="space-y-2">
-                    <label htmlFor="cardImageUpload" className="block text-sm font-medium text-neutral-dark">
-                      {t('addCardModal.uploadCardImage')}
-                    </label>
-                    <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-neutral-300 border-dashed rounded-md">
-                      <div className="space-y-1 text-center">
-                        <UploadIcon className="mx-auto h-12 w-12 text-neutral" />
-                        <div className="flex text-sm text-neutral-dark">
-                          <label
-                            htmlFor="cardImageUpload"
-                            className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-indigo-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary"
-                          >
-                            <span>{t('addCardModal.uploadFile')}</span>
-                            <input id="cardImageUpload" name="cardImageUpload" type="file" className="sr-only" accept="image/*" onChange={handleImageChange} />
-                          </label>
-                          <p className="pl-1">{t('addCardModal.dragAndDrop')}</p>
-                        </div>
-                        <p className="text-xs text-neutral">{t('addCardModal.fileTypes')}</p>
-                      </div>
+              {!isCameraOpen && !previewUrl && (
+                <div className="flex flex-col gap-6">
+                  <button
+                    onClick={openCamera}
+                    className="group relative flex flex-col items-center justify-center p-12 bg-indigo-600/10 hover:bg-indigo-600/20 border-2 border-dashed border-indigo-500/30 rounded-[40px] transition-all overflow-hidden"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="w-20 h-20 bg-indigo-500 rounded-3xl flex items-center justify-center mb-6 shadow-xl transform group-hover:scale-110 transition-transform">
+                      <CameraIcon className="w-10 h-10 text-white" />
+                    </div>
+                    <span className="text-xl font-black text-indigo-400">{t('addCardModal.openCamera')}</span>
+                    <p className="text-indigo-400/50 text-sm mt-2 font-medium">Capture photo directly from camera</p>
+                  </button>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-white/5"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase tracking-widest font-black text-slate-500">
+                      <span className="bg-slate-900 px-4">OR</span>
                     </div>
                   </div>
-                  <div className="mt-4 text-center">
-                    <p className="text-sm text-neutral-dark mb-2">{t('addCardModal.useCameraPrompt')}</p>
-                    <button
-                      type="button"
-                      onClick={openCamera}
-                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-indigo-700 border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                    >
-                      <CameraIcon className="w-5 h-5 mr-2" /> {t('addCardModal.useCamera')}
-                    </button>
 
-                    {/* Camera Selector (Only shown if devices available) */}
-                    {availableDevices.length > 1 && (
-                      <div className="mt-2 flex justify-center">
-                        <select
-                          value={selectedDeviceId}
-                          onChange={handleCameraChange}
-                          className="text-xs border border-neutral-300 rounded px-2 py-1 text-neutral-dark bg-white focus:ring-primary focus:border-primary"
-                        >
-                          <option value="">Auto Select Camera</option>
-                          {availableDevices.map((device, idx) => (
-                            <option key={device.deviceId} value={device.deviceId}>
-                              {device.label || `Camera ${idx + 1}`}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-
-                  {previewUrl && !selectedImage?.name.startsWith('camera_capture') && ( // Show preview if it's from file upload
-                    <div className="mt-4">
-                      <h3 className="text-sm font-medium text-neutral-dark mb-1">{t('addCardModal.imagePreview')}</h3>
-                      <img src={previewUrl} alt="Card preview" className="rounded-lg shadow-md max-h-48 w-auto mx-auto border" />
+                  <div className="relative group">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div className="flex items-center justify-center p-8 bg-white/5 hover:bg-white/10 border border-white/10 rounded-3xl transition-all">
+                      <UploadIcon className="w-6 h-6 text-indigo-400 mr-4" />
+                      <span className="text-slate-300 font-bold">{t('addCardModal.uploadImage')}</span>
                     </div>
-                  )}
-                </>
-              ) : (
-                // Camera View
-                <div className="space-y-3">
+                  </div>
+                </div>
+              )}
+
+              {isCameraOpen && (
+                <div className="relative rounded-[40px] overflow-hidden bg-black shadow-2xl border border-white/10 animate-fadeIn">
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
-                    muted /* Muted is important for autoplay without user gesture */
-                    className="w-full h-auto max-h-[300px] bg-neutral-dark rounded-md border border-neutral-300"
-                  />
+                    className="w-full h-auto aspect-video object-cover"
+                  ></video>
 
-                  {/* In-Camera Switcher */}
-                  {availableDevices.length > 1 && (
-                    <div className="flex justify-center mb-2">
+                  <div className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-6 px-6">
+                    {availableDevices.length > 1 && (
                       <select
-                        value={selectedDeviceId}
                         onChange={handleCameraChange}
-                        className="text-xs border border-neutral-300 rounded px-2 py-1 bg-white opacity-80"
+                        value={selectedDeviceId || ''}
+                        className="bg-black/60 backdrop-blur-md text-white text-xs font-black p-3 rounded-2xl border border-white/20 outline-none"
                       >
-                        {availableDevices.map((device, idx) => (
+                        {availableDevices.map(device => (
                           <option key={device.deviceId} value={device.deviceId}>
-                            {device.label || `Camera ${idx + 1}`}
+                            {device.label || `Camera ${device.deviceId.substring(0, 4)}`}
                           </option>
                         ))}
                       </select>
-                    </div>
-                  )}
+                    )}
 
-                  <div className="flex gap-2">
                     <button
-                      type="button"
                       onClick={capturePhoto}
-                      className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-secondary hover:bg-emerald-700 border border-transparent rounded-md shadow-sm"
+                      className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-2xl transform active:scale-90 transition-all border-[6px] border-indigo-500"
                     >
-                      <CameraIcon className="w-5 h-5 mr-2" /> {t('addCardModal.capturePhoto')}
+                      <div className="w-14 h-14 bg-white rounded-full border-2 border-slate-200"></div>
                     </button>
+
                     <button
                       type="button"
-                      onClick={closeCamera}
-                      className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-neutral-dark bg-neutral-light hover:bg-neutral-200 border border-neutral-300 rounded-md shadow-sm"
+                      onClick={() => isScanningQR ? setIsScanningQR(false) : startQrScanner()}
+                      className={`p-4 rounded-3xl border transition-all flex flex-col items-center gap-1 ${isScanningQR ? 'bg-emerald-500/20 text-emerald-400 border-emerald-400/20' : 'bg-white/5 text-slate-400 border-white/10'}`}
                     >
-                      {t('addCardModal.cancelCamera')}
+                      <QrCodeIcon className={`w-6 h-6 ${isScanningQR ? 'animate-pulse' : ''}`} />
+                      <span className="text-[10px] font-black uppercase tracking-tighter">{isScanningQR ? 'SCANNING' : 'QR SCAN'}</span>
+                    </button>
+
+                    <button
+                      onClick={closeCamera}
+                      className="p-4 bg-red-500/20 text-red-400 rounded-2xl border border-red-400/20 hover:bg-red-500/30 transition-all font-black"
+                    >
+                      Cancel
                     </button>
                   </div>
                 </div>
               )}
-              {/* Show preview from camera capture after capture, before scan */}
-              {previewUrl && selectedImage?.name?.startsWith('camera_capture') && !isCameraOpen && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium text-neutral-dark mb-1">{t('addCardModal.capturePreview')}</h3>
-                  <img src={previewUrl} alt="Captured card preview" className="rounded-lg shadow-md max-h-48 w-auto mx-auto border" />
+
+              {previewUrl && !isCameraOpen && (
+                <div className="relative group rounded-[40px] overflow-hidden shadow-2xl border border-white/10">
+                  <img src={previewUrl} alt="Preview" className="w-full h-auto object-cover max-h-[300px]" />
+                  <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                    <button
+                      onClick={() => { setPreviewUrl(null); setSelectedImage(null); }}
+                      className="p-4 bg-red-500 text-white rounded-2xl shadow-xl hover:scale-110 transition-all font-black"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={openCamera}
+                      className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl hover:scale-110 transition-all font-black"
+                    >
+                      Retake
+                    </button>
+                  </div>
                 </div>
               )}
             </>
           )}
 
           {step === 1 && uploadMode === 'file' && (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="documentFileUpload" className="block text-sm font-medium text-neutral-dark">
-                  {t('addCardModal.uploadDocPrompt')}
-                </label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-neutral-300 border-dashed rounded-md">
-                  <div className="space-y-1 text-center">
-                    <UploadIcon className="mx-auto h-12 w-12 text-neutral" />
-                    <div className="flex text-sm text-neutral-dark">
-                      <label
-                        htmlFor="documentFileUpload"
-                        className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-indigo-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary"
-                      >
-                        <span>{t('addCardModal.selectFile')}</span>
-                        <input id="documentFileUpload" name="documentFileUpload" type="file" className="sr-only" accept=".csv,.pdf" onChange={handleDocumentFileChange} />
-                      </label>
-                      <p className="pl-1">{t('addCardModal.dragAndDrop')}</p>
-                    </div>
-                    <p className="text-xs text-neutral">{t('addCardModal.docTypes')}</p>
+            <div className="flex flex-col gap-6">
+              <div className="relative group">
+                <input
+                  type="file"
+                  multiple
+                  accept=".csv,.pdf,text/csv,application/pdf"
+                  onChange={handleDocumentFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <div className="flex flex-col items-center justify-center p-16 bg-white/5 hover:bg-white/10 border-2 border-dashed border-white/10 rounded-[40px] transition-all">
+                  <div className="w-20 h-20 bg-emerald-500/10 rounded-3xl flex items-center justify-center mb-6 shadow-xl">
+                    <UploadIcon className="w-10 h-10 text-emerald-500" />
                   </div>
+                  <span className="text-xl font-black text-white">{selectedDocumentFiles.length > 0 ? `${selectedDocumentFiles.length} files selected` : t('addCardModal.clickToUpload')}</span>
+                  {selectedDocumentFiles.length > 0 && (
+                    <div className="mt-2 text-slate-500 text-sm font-medium text-center">
+                      {selectedDocumentFiles.map(f => f.name).join(', ')}
+                    </div>
+                  )}
+                  <p className="text-slate-500 text-sm mt-3 font-medium">Supports PDF or CSV files</p>
                 </div>
               </div>
-              {selectedDocumentFile && (
-                <div className="mt-4 p-3 bg-neutral-light rounded-md text-sm text-neutral-dark">
-                  {t('addCardModal.selectedFile', { fileName: selectedDocumentFile.name, fileSize: Math.round(selectedDocumentFile.size / 1024) })}
-                </div>
-              )}
-            </>
+            </div>
           )}
 
-          {step === 2 && (
-            <form className="space-y-3 sm:space-y-4">
-              {previewUrl && ( // Show image preview in review step
-                <div className="mb-3">
-                  <h3 className="text-sm font-medium text-neutral-dark mb-1">{t('addCardModal.cardImage')}</h3>
-                  <img src={previewUrl} alt="Card Scan Preview" className="rounded-lg shadow-md max-h-40 w-auto mx-auto border" />
+          {step === 2 && bulkContacts.length > 0 && (
+            <div className="space-y-3">
+              {bulkContacts.map((contact, index) => (
+                <div key={index} className="group p-4 bg-white/5 border border-white/5 hover:border-indigo-500/30 hover:bg-white/10 rounded-3xl flex items-center gap-4 transition-all">
+                  <div className="w-12 h-12 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center font-black text-indigo-400 text-xl shadow-inner">
+                    {contact.name ? contact.name[0].toUpperCase() : '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-black truncate">{contact.name || 'Unnamed Contact'}</div>
+                    <div className="text-slate-500 text-xs font-bold truncate">
+                      {contact.title ? `${contact.title} @ ` : ''}{contact.company || 'Private Entity'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeBulkContact(index)}
+                    className="p-3 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                    aria-label="Remove Contact"
+                  >
+                    <CloseIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+              <p className="text-center text-slate-500 text-sm font-bold mt-4 animate-pulse">
+                Review and remove any duplicates before importing
+              </p>
+            </div>
+          )}
+
+          {step === 2 && bulkContacts.length === 0 && (
+            <form className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
+              {previewUrl && (
+                <div className="col-span-full mb-6">
+                  <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-lg group">
+                    <img src={previewUrl} alt="Card" className="w-full h-48 object-cover opacity-60" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-indigo-600/20 backdrop-blur-[2px]">
+                      <span className="text-white font-black uppercase tracking-tighter text-3xl opacity-30">AI EXTRACTED</span>
+                    </div>
+                  </div>
                 </div>
               )}
-              {(Object.keys(formData) as Array<keyof CardFormData>).map((key) => {
-                const label = t(`addCardModal.form.${key}`);
 
-                return (
-                  <div key={key}>
-                    <label htmlFor={key} className="block text-sm font-medium text-neutral-dark">
-                      {label}
-                    </label>
-                    <input
-                      type="text"
-                      name={key}
-                      id={key}
-                      value={formData[key] || ''}
-                      onChange={handleFormChange}
-                      className="mt-1 block w-full px-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
-                      placeholder={t('addCardModal.form.enterPlaceholder', { field: label.toLowerCase() })}
-                    />
-                    {(key === 'phone' || key === 'email') && <p className="text-xs text-neutral mt-1">{t('addCardModal.form.commaSeparated')}</p>}
-                  </div>
-                );
-              })}
-              <div>
-                <label htmlFor="notes" className="block text-sm font-medium text-neutral-dark">
+              {(Object.keys(formData) as Array<keyof CardFormData>)
+                .filter(key => key !== 'notes')
+                .map((key) => {
+                  const label = t(`addCardModal.form.${key}`);
+                  return (
+                    <div key={key} className="space-y-2">
+                      <label htmlFor={key} className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
+                        {label}
+                      </label>
+                      <div className="relative group">
+                        <input
+                          type="text"
+                          name={key}
+                          id={key}
+                          value={formData[key] || ''}
+                          onChange={handleFormChange}
+                          className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600 group-hover:bg-white/10"
+                          placeholder={t('addCardModal.form.enterPlaceholder', { field: label.toLowerCase() })}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+
+              <div className="col-span-full space-y-2">
+                <label htmlFor="notes" className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
                   {t('addCardModal.form.notes')}
                 </label>
                 <textarea
@@ -769,7 +862,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
                   rows={3}
                   value={formData.notes || ''}
                   onChange={handleFormChange}
-                  className="mt-1 block w-full px-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
+                  className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600 group-hover:bg-white/10"
                   placeholder={t('addCardModal.form.enterPlaceholder', { field: t('addCardModal.form.notes').toLowerCase() })}
                 />
               </div>
@@ -777,57 +870,56 @@ const AddCardModal: React.FC<AddCardModalProps> = ({ isOpen, onClose, onSave }) 
           )}
         </main>
 
-        <footer className="flex flex-col sm:flex-row items-center justify-end gap-3 p-4 sm:p-6 border-t border-neutral-200 bg-neutral-light/50">
+        <footer className="p-8 bg-white/5 border-t border-white/5 flex flex-col sm:flex-row items-center justify-end gap-4">
           <button
             type="button"
             onClick={handleClose}
-            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-neutral-dark bg-white border border-neutral-300 rounded-md shadow-sm hover:bg-neutral-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+            className="w-full sm:w-auto px-8 py-4 text-slate-400 hover:text-white font-bold rounded-2xl border border-white/10 hover:bg-white/5 transition-all"
           >
             {t('addCardModal.cancel')}
           </button>
+
           {step === 1 && (
             <button
               type="button"
               onClick={uploadMode === 'image' ? handleScanImage : handleParseDocument}
               disabled={
                 isProcessing || isCameraOpen ||
-                (uploadMode === 'image' && !selectedImage && !previewUrl) || // Ensure an image is selected or captured
-                (uploadMode === 'file' && !selectedDocumentFile)
+                (uploadMode === 'image' && !selectedImage && !previewUrl) ||
+                (uploadMode === 'file' && selectedDocumentFiles.length === 0)
               }
-              className="w-full sm:w-auto flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-secondary hover:bg-emerald-700 border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary disabled:opacity-50 transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center px-10 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] transition-all disabled:opacity-30 disabled:translate-y-0 transform hover:-translate-y-1 active:scale-95"
             >
               {isProcessing ? (
-                <SpinnerIcon className="w-5 h-5 mr-2" />
+                <SpinnerIcon className="w-6 h-6 mr-3 animate-spin" />
               ) : (
-                uploadMode === 'image' ? <ScanIcon className="w-5 h-5 mr-2" /> : <FileTextIcon className="w-5 h-5 mr-2" />
+                uploadMode === 'image' ? <ScanIcon className="w-6 h-6 mr-3" /> : <FileTextIcon className="w-6 h-6 mr-3" />
               )}
               {isProcessing ? currentProcessingLabel : currentActionLabel}
             </button>
           )}
+
           {step === 2 && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setError(null);
-                  setCameraError(null);
-                  setStep(1);
-                  // Don't reset selected files/preview here, user might want to re-process with adjustments or re-upload/re-capture
-                }}
-                className="w-full sm:w-auto flex items-center justify-center px-4 py-2 text-sm font-medium text-neutral-dark bg-white border border-neutral-300 rounded-md shadow-sm hover:bg-neutral-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
-              >
-                <EditIcon className="w-5 h-5 mr-2" />
-                {t('addCardModal.editRescan')}
-              </button>
+            <div className="flex w-full sm:w-auto gap-4">
+              {!initialContact && (
+                <button
+                  type="button"
+                  onClick={() => { setError(null); setCameraError(null); setStep(1); }}
+                  className="flex-1 sm:flex-none px-6 py-4 bg-white/5 text-slate-300 font-bold rounded-2xl border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center"
+                >
+                  <EditIcon className="w-5 h-5 mr-3" />
+                  {t('addCardModal.editRescan')}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleSaveContact}
-                className="w-full sm:w-auto flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-indigo-700 border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+                className="flex-1 sm:flex-none px-10 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] transition-all flex items-center justify-center transform hover:-translate-y-1 active:scale-95"
               >
-                <UserIcon className="w-5 h-5 mr-2" />
-                {t('addCardModal.saveContact')}
+                <UserIcon className="w-6 h-6 mr-3" />
+                {bulkContacts.length > 0 ? t('addCardModal.importContacts', { count: bulkContacts.length }) : t('addCardModal.saveContact')}
               </button>
-            </>
+            </div>
           )}
         </footer>
       </div>

@@ -23,6 +23,30 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, '.'),
       }
     },
+    build: {
+      chunkSizeWarningLimit: 1200,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('router')) {
+                return 'vendor-react';
+              }
+              if (id.includes('@google/generative-ai')) {
+                return 'vendor-ai';
+              }
+              if (id.includes('pdfjs-dist')) {
+                return 'vendor-pdf';
+              }
+              if (id.includes('papaparse') || id.includes('html2canvas') || id.includes('file-saver') || id.includes('i18next')) {
+                return 'vendor-utils';
+              }
+              return 'vendor'; // all other node_modules
+            }
+          }
+        }
+      }
+    },
     test: {
       globals: true,
       environment: 'jsdom',
